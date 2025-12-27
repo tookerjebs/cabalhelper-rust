@@ -115,21 +115,40 @@ impl ImageClickerTool {
             }
 
             while *running.lock().unwrap() {
-                // Find and move mouse
-                // precision: f32, move_time: f32
-                match gui.find_image_on_screen_and_move_mouse(precision as f32, 0.2) {
-                    Ok(Some(_matches)) => {
-                        // Image found and mouse moved
-                        // Now click
-                        if let Err(e) = gui.click(MouseClick::LEFT) {
-                            println!("Click error: {}", e);
+                // Find image only (no mouse movement)
+                match gui.find_image_on_screen(precision as f32) {
+                    Ok(Some(matches)) => {
+                        if let Some((x, y, _)) = matches.first() {
+                             // Use our low-level clicker which uses SendMessage
+                             // Use unsafe block for WinAPI calls
+                             unsafe {
+                                use windows::Win32::UI::WindowsAndMessaging::WindowFromPoint;
+                                use windows::Win32::Foundation::POINT;
+                                use crate::core::input::click_at_position;
+                                use crate::core::window::screen_to_window_coords;
+                                
+                                // Convert u32 match to i32 for Windows API
+                                let center_x = *x as i32;
+                                let center_y = *y as i32;
+                                
+                                // Find window at that position
+                                let hwnd = WindowFromPoint(POINT { x: center_x, y: center_y });
+                                if hwnd.0 != 0 {
+                                    // Convert screen coordinates to client coordinates
+                                    if let Some((client_x, client_y)) = screen_to_window_coords(hwnd, center_x, center_y) {
+                                        // Send direct click message (PostMessage)
+                                        // This does NOT move the cursor
+                                        click_at_position(hwnd, client_x, client_y);
+                                    }
+                                }
+                             }
                         }
                     },
                     Ok(None) => {
                         // Not found
                     },
                     Err(e) => {
-                        println!("Search error: {}", e);
+                         println!("Search error: {}", e);
                     }
                 }
 
