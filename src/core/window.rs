@@ -6,17 +6,29 @@ use windows::{
     Win32::Graphics::Gdi::ScreenToClient,
 };
 
-/// Find game window by class name "D3D Window"
+/// Find game window
+/// Priority 1: Window with title "PlayCabal EP36"
+/// Priority 2: Window with class name "D3D Window" (legacy/fallback)
 pub fn find_game_window() -> Option<HWND> {
     unsafe {
-        // Try to find window by class name "D3D Window"
-        let hwnd = FindWindowA(
+        // 1. Try to find by specific Window Title
+        let hwnd_by_title = FindWindowA(
+            windows::core::PCSTR::null(),
+            windows::core::PCSTR("PlayCabal EP36\0".as_ptr()),
+        );
+
+        if hwnd_by_title.0 != 0 && IsWindow(hwnd_by_title).as_bool() {
+            return Some(hwnd_by_title);
+        }
+
+        // 2. Fallback: Try to find by class name "D3D Window"
+        let hwnd_by_class = FindWindowA(
             windows::core::PCSTR("D3D Window\0".as_ptr()),
             windows::core::PCSTR::null(),
         );
 
-        if hwnd.0 != 0 && IsWindow(hwnd).as_bool() {
-            Some(hwnd)
+        if hwnd_by_class.0 != 0 && IsWindow(hwnd_by_class).as_bool() {
+            Some(hwnd_by_class)
         } else {
             None
         }

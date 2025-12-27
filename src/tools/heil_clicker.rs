@@ -39,6 +39,17 @@ impl Default for HeilClickerTool {
 }
 
 impl HeilClickerTool {
+    pub fn set_game_hwnd(&mut self, hwnd: Option<windows::Win32::Foundation::HWND>) {
+        self.game_hwnd = hwnd;
+        if hwnd.is_none() {
+            *self.calibrating.lock().unwrap() = false;
+            *self.running.lock().unwrap() = false;
+            self.status = "Disconnected".to_string();
+        } else {
+             self.status = "Connected - Ready to calibrate".to_string();
+        }
+    }
+
     pub fn update(&mut self, ui: &mut egui::Ui) {
         // Check for calibration click
         let is_calibrating = *self.calibrating.lock().unwrap();
@@ -79,22 +90,11 @@ impl HeilClickerTool {
 
         ui.separator();
 
-        // Connect/Disconnect button
+        // Connect/Disconnect handled globally
         if self.game_hwnd.is_none() {
-            if ui.button("Connect to Game").clicked() {
-                if let Some(hwnd) = find_game_window() {
-                    self.game_hwnd = Some(hwnd);
-                    self.status = "Connected to game - Click 'Calibrate' to set position".to_string();
-                } else {
-                    self.status = "Game window not found".to_string();
-                }
-            }
+            ui.colored_label(egui::Color32::RED, "Please connect to game first (top right)");
         } else {
-            if ui.button("Disconnect").clicked() {
-                self.game_hwnd = None;
-                *self.calibrating.lock().unwrap() = false;
-                self.status = "Disconnected".to_string();
-            }
+            ui.colored_label(egui::Color32::GREEN, "Game Connected");
         }
 
         ui.separator();
