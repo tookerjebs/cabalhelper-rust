@@ -1,0 +1,29 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.exe
+*.pdb
+
+# Settings (may contain sensitive data)
+settings.json
+
+# Logs
+*.log
+
+# Legacy Python reference code
+LEGACY_REFERNCE_PYTHON_VERSION/
+
