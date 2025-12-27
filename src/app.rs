@@ -37,13 +37,14 @@ enum Tab {
     #[default]
     HeilClicker,
     CollectionFiller,
-    ImageClicker,
+    AcceptItem,
 }
 
 impl eframe::App for CabalHelperApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Emergency stop on ESC key
-        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+        // Emergency stop on ESC key - using Windows API so it works even when game has focus
+        use crate::core::input::is_escape_key_down;
+        if is_escape_key_down() {
             self.heil_clicker.stop();
             self.collection_filler.stop();
             self.image_clicker.stop();
@@ -56,6 +57,7 @@ impl eframe::App for CabalHelperApp {
                 self.game_title = "Connection Lost".to_string();
                 self.heil_clicker.set_game_hwnd(None);
                 self.collection_filler.set_game_hwnd(None);
+                self.image_clicker.set_game_hwnd(None);
             }
         }
 
@@ -73,6 +75,7 @@ impl eframe::App for CabalHelperApp {
                                 self.game_title = "Connected: PlayCabal EP36".to_string(); 
                                 self.heil_clicker.set_game_hwnd(Some(hwnd));
                                 self.collection_filler.set_game_hwnd(Some(hwnd));
+                                self.image_clicker.set_game_hwnd(Some(hwnd));
                             } else {
                                 self.game_title = "Game not found".to_string();
                             }
@@ -84,6 +87,7 @@ impl eframe::App for CabalHelperApp {
                             self.game_title = "Disconnected".to_string();
                             self.heil_clicker.set_game_hwnd(None);
                             self.collection_filler.set_game_hwnd(None);
+                            self.image_clicker.set_game_hwnd(None);
                         }
                     }
                 });
@@ -95,7 +99,7 @@ impl eframe::App for CabalHelperApp {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.selected_tab, Tab::HeilClicker, "Heil Clicker");
                 ui.selectable_value(&mut self.selected_tab, Tab::CollectionFiller, "Collection Filler");
-                ui.selectable_value(&mut self.selected_tab, Tab::ImageClicker, "Image Clicker");
+                ui.selectable_value(&mut self.selected_tab, Tab::AcceptItem, "Accept Item");
             });
             ui.separator();
 
@@ -108,8 +112,8 @@ impl eframe::App for CabalHelperApp {
                     Tab::CollectionFiller => {
                         self.collection_filler.update(ctx, ui);
                     }
-                    Tab::ImageClicker => {
-                        self.image_clicker.update(ui);
+                    Tab::AcceptItem => {
+                        self.image_clicker.update(ctx, ui);
                     }
                 }
             });

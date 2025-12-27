@@ -31,3 +31,11 @@ pub fn is_left_mouse_down() -> bool {
         (key_state as u16) & 0x8000 != 0
     }
 }
+
+/// Check if ESC key is currently down (works even when app doesn't have focus)
+pub fn is_escape_key_down() -> bool {
+    unsafe {
+        let key_state = GetAsyncKeyState(0x1B); // VK_ESCAPE
+        (key_state as u16) & 0x8000 != 0
+    }
+}

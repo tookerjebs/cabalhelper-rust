@@ -1,6 +1,7 @@
 mod core;
 mod tools;
 mod app;
+mod settings;
 
 use eframe::egui;
 use app::CabalHelperApp;

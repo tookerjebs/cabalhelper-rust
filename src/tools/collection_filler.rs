@@ -1,12 +1,11 @@
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::fs;
 use eframe::egui;
 use serde::{Serialize, Deserialize};
 use windows::Win32::Foundation::HWND;
 use rustautogui::{RustAutoGui, MatchMode};
-use crate::core::input::click_at_position;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CollectionSettings {
@@ -439,13 +438,71 @@ impl CollectionFillerTool {
                 }
             };
             
-            // Load red dot template
-            if let Err(e) = gui.prepare_template_from_file(
+            // Convert window-relative areas to screen-absolute regions
+            use crate::core::window::get_window_rect;
+            let window_rect = match get_window_rect(game_hwnd) {
+                Some(rect) => rect,
+                None => {
+                    *status.lock().unwrap() = "❌ Failed to get window position".to_string();
+                    *running.lock().unwrap() = false;
+                    return;
+                }
+            };
+            
+            let tabs_area = settings.collection_tabs_area.unwrap();
+            let dungeon_area = settings.dungeon_list_area.unwrap();
+            let items_area = settings.collection_items_area.unwrap();
+            
+            // Convert to screen coordinates (x, y, width, height)
+            let tabs_region = (
+                (window_rect.0 + tabs_area.0) as u32,
+                (window_rect.1 + tabs_area.1) as u32,
+                tabs_area.2 as u32,
+                tabs_area.3 as u32
+            );
+            let dungeon_region = (
+                (window_rect.0 + dungeon_area.0) as u32,
+                (window_rect.1 + dungeon_area.1) as u32,
+                dungeon_area.2 as u32,
+                dungeon_area.3 as u32
+            );
+            let items_region = (
+                (window_rect.0 + items_area.0) as u32,
+                (window_rect.1 + items_area.1) as u32,
+                items_area.2 as u32,
+                items_area.3 as u32
+            );
+            
+            // Store red dot template 3 times with different regions (FAST region-limited capture!)
+            if let Err(e) = gui.store_template_from_file(
                 &red_dot_path,
-                None,
-                MatchMode::Segmented
+                Some(tabs_region),
+                MatchMode::Segmented,
+                "tabs_dots"
             ) {
-                *status.lock().unwrap() = format!("❌ Failed to load red-dot template: {}", e);
+                *status.lock().unwrap() = format!("❌ Failed to load tabs template: {}", e);
+                *running.lock().unwrap() = false;
+                return;
+            }
+            
+            if let Err(e) = gui.store_template_from_file(
+                &red_dot_path,
+                Some(dungeon_region),
+                MatchMode::Segmented,
+                "dungeon_dots"
+            ) {
+                *status.lock().unwrap() = format!("❌ Failed to load dungeon template: {}", e);
+                *running.lock().unwrap() = false;
+                return;
+            }
+            
+            if let Err(e) = gui.store_template_from_file(
+                &red_dot_path,
+                Some(items_region),
+                MatchMode::Segmented,
+                "items_dots"
+            ) {
+                *status.lock().unwrap() = format!("❌ Failed to load items template: {}", e);
                 *running.lock().unwrap() = false;
                 return;
             }
@@ -454,12 +511,10 @@ impl CollectionFillerTool {
 
             // Main automation loop - scan for tab red dots
             while *running.lock().unwrap() {
-                let tabs_area = settings.collection_tabs_area.unwrap();
-                
-                match find_red_dots_in_area(&mut gui, game_hwnd, tabs_area, settings.red_dot_tolerance) {
+                match find_red_dots_stored(&mut gui, "tabs_dots", settings.red_dot_tolerance) {
                     Some(dots) if !dots.is_empty() => {
                         let tab_pos = dots[0];
-                        *status.lock().unwrap() = format!("Found tab red dot at ({}, {}), clicking...", tab_pos.0, tab_pos.1);
+                        *status.lock().unwrap() = format!("Found tab red dot, clicking...");
                         
                         // Click the tab
                         click_at_screen(&mut gui, game_hwnd, tab_pos.0, tab_pos.1);
@@ -490,40 +545,21 @@ fn delay_ms(ms: u64) {
     }
 }
 
-fn find_red_dots_in_area(
+fn find_red_dots_stored(
     gui: &mut RustAutoGui,
-    game_hwnd: HWND,
-    area: (i32, i32, i32, i32),
+    alias: &str,
     precision: f32
 ) -> Option<Vec<(u32, u32)>> {
-    use crate::core::window::get_window_rect;
+    let start_time = Instant::now();
     
-    // Get window position
-    let window_rect = get_window_rect(game_hwnd)?;
-    
-    // Convert window-relative area to screen coordinates
-    let (left, top, width, height) = area;
-    let screen_left = window_rect.0 + left;
-    let screen_top = window_rect.1 + top;
-    let screen_right = screen_left + width;
-    let screen_bottom = screen_top + height;
-    
-
-    
-    // Store template with region
-    match gui.find_image_on_screen(precision) {
+    match gui.find_stored_image_on_screen(precision, alias) {
         Ok(Some(matches)) => {
-            // Filter matches to be within our area
             let filtered: Vec<(u32, u32)> = matches.iter()
-                .filter_map(|(x, y, _score)| {
-                    if *x >= screen_left as u32 && *x <= screen_right as u32 &&
-                       *y >= screen_top as u32 && *y <= screen_bottom as u32 {
-                        Some((*x, *y))
-                    } else {
-                        None
-                    }
-                })
+                .map(|(x, y, _score)| (*x, *y))
                 .collect();
+            
+            let elapsed = start_time.elapsed();
+            println!("🕐 find_red_dots_stored('{}') took: {:?}, found {} dots", alias, elapsed, filtered.len());
             
             if filtered.is_empty() {
                 None
@@ -531,39 +567,60 @@ fn find_red_dots_in_area(
                 Some(filtered)
             }
         },
-        Ok(None) => None,
+        Ok(None) => {
+            let elapsed = start_time.elapsed();
+            println!("🕐 find_red_dots_stored('{}') took: {:?}, found 0 dots", alias, elapsed);
+            None
+        },
         Err(e) => {
-            println!("Error finding red dots: {}", e);
+            println!("Error finding red dots in '{}': {}", alias, e);
             None
         }
     }
 }
 
-fn click_at_screen(gui: &mut RustAutoGui, game_hwnd: HWND, x: u32, y: u32) {
-    // Don't need gui - use direct click
-    let _ = gui;
-    
-    // x, y are screen coordinates from red dot detection
-    // Convert to window-relative coordinates
-    use crate::core::window::get_window_rect;
-    
-    if let Some(window_rect) = get_window_rect(game_hwnd) {
-        let window_x = x as i32 - window_rect.0;
-        let window_y = y as i32 - window_rect.1;
+fn click_at_screen(gui: &mut RustAutoGui, _game_hwnd: HWND, x: u32, y: u32) {
+    // Python does 2 click attempts with 50ms delay (line 191-194)
+    for attempt in 0..2 {
+        // Move mouse to position (screen coordinates)
+        if let Err(e) = gui.move_mouse_to_pos(x as u32, y as u32, 0.0) {
+            println!("Failed to move mouse (attempt {}): {}", attempt + 1, e);
+            if attempt == 0 {
+                thread::sleep(Duration::from_millis(50));
+                continue;
+            }
+            return;
+        }
         
-        // Use direct click at window-relative position
-        click_at_position(game_hwnd, window_x, window_y);
+        // Short sleep to stabilize cursor
+        thread::sleep(Duration::from_millis(20));
+        
+        // Perform physical left click
+        if let Err(e) = gui.left_click() {
+            println!("Failed to click (attempt {}): {}", attempt + 1, e);
+            if attempt == 0 {
+                thread::sleep(Duration::from_millis(50));
+                continue;
+            }
+        } else {
+            // Success on first or second attempt
+            return;
+        }
     }
 }
 
 fn click_button(gui: &mut RustAutoGui, game_hwnd: HWND, button_pos: Option<(i32, i32)>) -> bool {
-    // Don't need gui for direct clicking
-    let _ = gui;
-    
-    if let Some((x, y)) = button_pos {
-        // Use direct click at position - much faster
-        click_at_position(game_hwnd, x, y);
-        return true;
+    if let Some((rel_x, rel_y)) = button_pos {
+        use crate::core::window::get_window_rect;
+        
+        // Convert window-relative coordinates to screen coordinates
+        if let Some((win_x, win_y, _, _)) = get_window_rect(game_hwnd) {
+            let screen_x = win_x + rel_x;
+            let screen_y = win_y + rel_y;
+            
+            click_at_screen(gui, game_hwnd, screen_x as u32, screen_y as u32);
+            return true;
+        }
     }
     false
 }
@@ -645,14 +702,13 @@ fn process_dungeons_on_current_page(
     status: &Arc<Mutex<String>>
 ) -> bool {
     let mut items_processed = false;
-    let dungeon_area = settings.dungeon_list_area.unwrap();
     
     while *running.lock().unwrap() {
-        // Find next dungeon with red dot
-        match find_red_dots_in_area(gui, game_hwnd, dungeon_area, settings.red_dot_tolerance) {
+        // Find next dungeon with red dot (single scan)
+        match find_red_dots_stored(gui, "dungeon_dots", settings.red_dot_tolerance) {
             Some(dots) if !dots.is_empty() => {
                 let dungeon_pos = dots[0];
-                *status.lock().unwrap() = format!("Found dungeon at ({}, {}), clicking...", dungeon_pos.0, dungeon_pos.1);
+                *status.lock().unwrap() = format!("Found dungeon, clicking...");
                 
                 // Click the dungeon
                 click_at_screen(gui, game_hwnd, dungeon_pos.0, dungeon_pos.1);
@@ -662,31 +718,37 @@ fn process_dungeons_on_current_page(
                 scroll_in_area(gui, game_hwnd, settings.collection_items_area.unwrap(), -20);
                 delay_ms(settings.delay_ms);
                 
-                // Process items with double-check pattern like Python version
+                // Process items - Python does this with double-check!
                 let max_scroll_passes = 50;
-                for scroll_pass in 0..max_scroll_passes {
+                for _scroll_pass in 0..max_scroll_passes {
                     if !*running.lock().unwrap() {
                         break;
                     }
                     
-                    // Process all items at current scroll position
+                    // Process ALL red dots at current scroll position
                     if process_all_items_at_position(gui, settings, game_hwnd, running, status) {
                         items_processed = true;
                     }
                     
-                    // Critical: Double-check that no red dots remain
-                    let items_area = settings.collection_items_area.unwrap();
-                    match find_red_dots_in_area(gui, game_hwnd, items_area, settings.red_dot_tolerance) {
+                    // CRITICAL: Double-check that NO red dots remain (Python lines 415-423)
+                    match find_red_dots_stored(gui, "items_dots", settings.red_dot_tolerance) {
                         Some(remaining) if !remaining.is_empty() => {
-                            // Still have dots, process again (belt and suspenders)
+                            // Still have red dots - process them again
                             process_all_items_at_position(gui, settings, game_hwnd, running, status);
-                            delay_ms(settings.delay_ms);
+                            
+                            // Check one more time
+                            match find_red_dots_stored(gui, "items_dots", settings.red_dot_tolerance) {
+                                Some(still_remaining) if !still_remaining.is_empty() => {
+                                    // Still there - might be stuck, but continue anyway
+                                },
+                                _ => {}
+                            }
                         },
                         _ => {}
                     }
                     
-                    // Check if this dungeon still has a red dot nearby
-                    match find_red_dots_in_area(gui, game_hwnd, dungeon_area, settings.red_dot_tolerance) {
+                    // Check if this dungeon still has red dot
+                    match find_red_dots_stored(gui, "dungeon_dots", settings.red_dot_tolerance) {
                         Some(remaining_dungeons) => {
                             let dungeon_still_red = remaining_dungeons.iter().any(|(x, y)| {
                                 let dist = ((*x as f32 - dungeon_pos.0 as f32).powi(2) +
@@ -696,14 +758,14 @@ fn process_dungeons_on_current_page(
                             
                             if !dungeon_still_red {
                                 *status.lock().unwrap() = "Dungeon complete, moving to next...".to_string();
-                                break; // Move to next dungeon
+                                break;
                             }
                         },
                         None => break,
                     }
                     
                     // Scroll down for next batch of items
-                    scroll_in_area(gui, game_hwnd, items_area, 5);
+                    scroll_in_area(gui, game_hwnd, settings.collection_items_area.unwrap(), 5);
                     delay_ms(settings.delay_ms);
                 }
             },
@@ -725,12 +787,12 @@ fn process_all_items_at_position(
     status: &Arc<Mutex<String>>
 ) -> bool {
     let mut items_processed = false;
-    let items_area = settings.collection_items_area.unwrap();
     let mut last_pos: Option<(u32, u32)> = None;
     let mut stuck_count = 0;
     
     while *running.lock().unwrap() {
-        match find_red_dots_in_area(gui, game_hwnd, items_area, settings.red_dot_tolerance) {
+        // Single scan using stored template (fast!)
+        match find_red_dots_stored(gui, "items_dots", settings.red_dot_tolerance) {
             Some(dots) if !dots.is_empty() => {
                 let item_pos = dots[0];
                 
@@ -758,7 +820,9 @@ fn process_all_items_at_position(
                 // Execute button sequence
                 execute_button_sequence(gui, settings, game_hwnd, status);
                 items_processed = true;
-                delay_ms(settings.delay_ms);
+                
+                // Extra delay to give game time to remove red dot (prevents stuck loop)
+                delay_ms(settings.delay_ms * 2);
             },
             _ => break,
         }
@@ -789,12 +853,10 @@ fn execute_button_sequence(
 fn tab_still_has_red_dot(
     gui: &mut RustAutoGui,
     settings: &CollectionSettings,
-    game_hwnd: HWND,
+    _game_hwnd: HWND,
     original_pos: (u32, u32)
 ) -> bool {
-    let tabs_area = settings.collection_tabs_area.unwrap();
-    
-    match find_red_dots_in_area(gui, game_hwnd, tabs_area, 0.85) {
+    match find_red_dots_stored(gui, "tabs_dots", settings.red_dot_tolerance) {
         Some(dots) => {
             dots.iter().any(|(x, y)| {
                 let dist = ((*x as f32 - original_pos.0 as f32).powi(2) + 
