@@ -73,10 +73,8 @@ impl Default for HeilClickerSettings {
 pub struct AcceptItemSettings {
     pub image_path: String,
     pub interval_ms: u64,
-    pub tolerance: f32,
+    pub tolerance: f32, // Treated as Minimum Confidence (0.0-1.0), default 0.85
     pub search_region: Option<(i32, i32, i32, i32)>,
-    #[serde(default = "default_min_confidence")]
-    pub min_confidence: f32,
 }
 
 impl Default for AcceptItemSettings {
@@ -84,19 +82,14 @@ impl Default for AcceptItemSettings {
         Self {
             image_path: "image.png".to_string(),
             interval_ms: 1000,
-            tolerance: 0.15, // 15% tolerance = 0.85 precision
+            tolerance: 0.85, 
             search_region: None,
-            min_confidence: 0.90, // Only click if 90%+ confident
         }
     }
 }
 
 fn default_red_dot_tolerance() -> f32 {
     0.85
-}
-
-fn default_min_confidence() -> f32 {
-    0.90
 }
 
 impl AppSettings {

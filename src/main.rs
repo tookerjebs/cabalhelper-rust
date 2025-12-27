@@ -2,6 +2,9 @@ mod core;
 mod tools;
 mod app;
 mod settings;
+mod automation;
+mod calibration;
+mod ui;
 
 use eframe::egui;
 use app::CabalHelperApp;
