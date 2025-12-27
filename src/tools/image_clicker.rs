@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use eframe::egui;
-use rustautogui::{RustAutoGui, MatchMode, MouseClick};
+use rustautogui::{RustAutoGui, MatchMode};
 
 pub struct ImageClickerTool {
     // UI Settings
@@ -30,6 +30,11 @@ impl Default for ImageClickerTool {
 }
 
 impl ImageClickerTool {
+    pub fn stop(&mut self) {
+        *self.running.lock().unwrap() = false;
+        self.status = "Stopped (ESC pressed)".to_string();
+    }
+
     pub fn update(&mut self, ui: &mut egui::Ui) {
         ui.heading("Image Clicker (RustAutoGui)");
         ui.label("Automatically finds an image on screen and clicks it.");

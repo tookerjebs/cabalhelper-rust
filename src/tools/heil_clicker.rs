@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use crate::core::window::{find_game_window, is_window_valid, get_window_under_cursor, is_game_window_or_child, screen_to_window_coords, get_cursor_pos};
+use crate::core::window::{is_window_valid, get_window_under_cursor, is_game_window_or_child, screen_to_window_coords, get_cursor_pos};
 use crate::core::input::{click_at_position, is_left_mouse_down};
 use eframe::egui;
 
@@ -48,6 +48,11 @@ impl HeilClickerTool {
         } else {
              self.status = "Connected - Ready to calibrate".to_string();
         }
+    }
+
+    pub fn stop(&mut self) {
+        *self.running.lock().unwrap() = false;
+        self.status = "Stopped (ESC pressed)".to_string();
     }
 
     pub fn update(&mut self, ui: &mut egui::Ui) {

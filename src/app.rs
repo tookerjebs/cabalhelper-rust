@@ -1,6 +1,7 @@
 use eframe::egui;
 use crate::tools::heil_clicker::HeilClickerTool;
 use crate::tools::image_clicker::ImageClickerTool;
+use crate::tools::collection_filler::CollectionFillerTool;
 use crate::core::window::{find_game_window, is_window_valid};
 use windows::Win32::Foundation::HWND;
 
@@ -8,6 +9,7 @@ pub struct CabalHelperApp {
     // Current valid tools
     heil_clicker: HeilClickerTool,
     image_clicker: ImageClickerTool,
+    collection_filler: CollectionFillerTool,
     
     // Global Game State
     game_hwnd: Option<HWND>,
@@ -22,6 +24,7 @@ impl Default for CabalHelperApp {
         Self {
             heil_clicker: HeilClickerTool::default(),
             image_clicker: ImageClickerTool::default(),
+            collection_filler: CollectionFillerTool::default(),
             game_hwnd: None,
             game_title: "Not Connected".to_string(),
             selected_tab: Tab::default(),
@@ -39,6 +42,12 @@ enum Tab {
 
 impl eframe::App for CabalHelperApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Emergency stop on ESC key
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            self.heil_clicker.stop();
+            self.collection_filler.stop();
+            self.image_clicker.stop();
+        }
         
         // Periodic check if window is still valid
         if let Some(hwnd) = self.game_hwnd {
@@ -46,6 +55,7 @@ impl eframe::App for CabalHelperApp {
                 self.game_hwnd = None;
                 self.game_title = "Connection Lost".to_string();
                 self.heil_clicker.set_game_hwnd(None);
+                self.collection_filler.set_game_hwnd(None);
             }
         }
 
@@ -62,6 +72,7 @@ impl eframe::App for CabalHelperApp {
                                 // Ideally we get window title from HWND but for now simple static text:
                                 self.game_title = "Connected: PlayCabal EP36".to_string(); 
                                 self.heil_clicker.set_game_hwnd(Some(hwnd));
+                                self.collection_filler.set_game_hwnd(Some(hwnd));
                             } else {
                                 self.game_title = "Game not found".to_string();
                             }
@@ -72,6 +83,7 @@ impl eframe::App for CabalHelperApp {
                             self.game_hwnd = None;
                             self.game_title = "Disconnected".to_string();
                             self.heil_clicker.set_game_hwnd(None);
+                            self.collection_filler.set_game_hwnd(None);
                         }
                     }
                 });
@@ -94,10 +106,7 @@ impl eframe::App for CabalHelperApp {
                         self.heil_clicker.update(ui);
                     }
                     Tab::CollectionFiller => {
-                        ui.heading("Collection Filler");
-                        ui.label("This tool is coming soon!");
-                        ui.add_space(10.0);
-                        ui.colored_label(egui::Color32::from_rgb(255, 128, 0), "Placeholder: Migration pending.");
+                        self.collection_filler.update(ctx, ui);
                     }
                     Tab::ImageClicker => {
                         self.image_clicker.update(ui);
@@ -107,3 +116,4 @@ impl eframe::App for CabalHelperApp {
         });
     }
 }
+
