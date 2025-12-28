@@ -25,6 +25,10 @@ pub struct CabalHelperApp {
 
     // Overlay state
     is_overlay_mode: bool,
+    
+    // Optimization state
+    last_window_check: std::time::Instant,
+    last_esc_check: std::time::Instant,
 }
 
 impl Default for CabalHelperApp {
@@ -41,6 +45,8 @@ impl Default for CabalHelperApp {
             game_title: "Not Connected".to_string(),
             selected_tab: Tab::default(),
             is_overlay_mode: false,
+            last_window_check: std::time::Instant::now(),
+            last_esc_check: std::time::Instant::now(),
         }
     }
 }
@@ -55,23 +61,38 @@ enum Tab {
 
 impl eframe::App for CabalHelperApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Emergency stop on ESC key - using Windows API so it works even when game has focus
+        // Adaptive repaint rate based on mode
+        // Overlay: 10 FPS for smooth auto-snap, Normal: 2 FPS for low CPU
+        let repaint_interval = if self.is_overlay_mode {
+            std::time::Duration::from_millis(100) // 10 FPS for overlay
+        } else {
+            std::time::Duration::from_millis(500) // 2 FPS for normal mode
+        };
+        ctx.request_repaint_after(repaint_interval);
+        
+        // Emergency stop on ESC key - throttled to every 100ms
         use crate::core::input::is_escape_key_down;
-        if is_escape_key_down() {
-            self.heil_clicker.stop();
-            self.collection_filler.stop();
-            self.image_clicker.stop();
+        if self.last_esc_check.elapsed() > std::time::Duration::from_millis(100) {
+            if is_escape_key_down() {
+                self.heil_clicker.stop();
+                self.collection_filler.stop();
+                self.image_clicker.stop();
+            }
+            self.last_esc_check = std::time::Instant::now();
         }
         
-        // Periodic check if window is still valid
-        if let Some(hwnd) = self.game_hwnd {
-            if !is_window_valid(hwnd) {
-                self.game_hwnd = None;
-                self.game_title = "Connection Lost".to_string();
-                self.heil_clicker.set_game_hwnd(None);
-                self.collection_filler.set_game_hwnd(None);
-                self.image_clicker.set_game_hwnd(None);
+        // Periodic check if window is still valid - throttled to every 2 seconds
+        if self.last_window_check.elapsed() > std::time::Duration::from_secs(2) {
+            if let Some(hwnd) = self.game_hwnd {
+                if !is_window_valid(hwnd) {
+                    self.game_hwnd = None;
+                    self.game_title = "Connection Lost".to_string();
+                    self.heil_clicker.set_game_hwnd(None);
+                    self.collection_filler.set_game_hwnd(None);
+                    self.image_clicker.set_game_hwnd(None);
+                }
             }
+            self.last_window_check = std::time::Instant::now();
         }
 
         let mut panel = egui::CentralPanel::default();
@@ -142,6 +163,7 @@ impl eframe::App for CabalHelperApp {
                                self.image_clicker.stop();
                                self.heil_clicker.start(&self.settings.heil_clicker); 
                            }
+                           ctx.request_repaint(); // Immediate visual update
                         }
 
                         // 2. Collection Filler
@@ -153,6 +175,7 @@ impl eframe::App for CabalHelperApp {
                                self.image_clicker.stop();
                                self.collection_filler.start(&self.settings.collection_filler);
                            }
+                           ctx.request_repaint(); // Immediate visual update
                         }
 
                         // 3. Accept Item
@@ -164,6 +187,7 @@ impl eframe::App for CabalHelperApp {
                                self.collection_filler.stop();
                                self.image_clicker.start(&self.settings.accept_item);
                            }
+                           ctx.request_repaint(); // Immediate visual update
                         }
 
                         ui.separator();
