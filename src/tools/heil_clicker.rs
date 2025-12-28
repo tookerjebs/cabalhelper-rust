@@ -120,6 +120,18 @@ impl HeilClickerTool {
         }
     }
 
+    pub fn start(&mut self, settings: &HeilClickerSettings) {
+        let delay = self.delay_ms_str.parse::<u64>().unwrap_or(200);
+        
+        if self.game_hwnd.is_none() {
+            *self.status.lock().unwrap() = "Connect to game first".to_string();
+        } else if settings.click_position.is_none() {
+            *self.status.lock().unwrap() = "Calibrate position first".to_string();
+        } else {
+            self.start_clicking(settings.click_position.unwrap(), delay);
+        }
+    }
+
     fn start_clicking(&mut self, pos: (i32, i32), delay: u64) {
         let running = Arc::clone(&self.running);
         let status = Arc::clone(&self.status);

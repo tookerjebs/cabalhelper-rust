@@ -6,6 +6,7 @@ pub enum HeaderAction {
     Connect(HWND),
     Disconnect,
     Save,
+    ToggleOverlay,
     None
 }
 
@@ -20,9 +21,12 @@ pub fn render_header(
     ui.horizontal(|ui| {
         ui.heading("Cabal Helper");
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            // Save button always visible
             if ui.button("💾 Save Settings").clicked() {
                 action = HeaderAction::Save;
+            }
+
+            if ui.button("👁 Overlay").clicked() {
+                action = HeaderAction::ToggleOverlay;
             }
             
             ui.separator();

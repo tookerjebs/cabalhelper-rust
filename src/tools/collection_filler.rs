@@ -132,6 +132,14 @@ impl CollectionFillerTool {
         settings.yes_pos.is_some()
     }
 
+    pub fn start(&mut self, settings: &CollectionFillerSettings) {
+        if self.is_fully_calibrated(settings) {
+            self.start_automation(settings.clone());
+        } else {
+            *self.status.lock().unwrap() = "Please calibrate all required items first".to_string();
+        }
+    }
+
     fn start_automation(&mut self, settings: CollectionFillerSettings) {
         let running = Arc::clone(&self.running);
         let status = Arc::clone(&self.status);

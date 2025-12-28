@@ -122,6 +122,17 @@ impl ImageClickerTool {
         }
     }
 
+    pub fn start(&mut self, settings: &AcceptItemSettings) {
+        if self.game_hwnd.is_none() {
+            *self.status.lock().unwrap() = "Connect to game first".to_string();
+        } else {
+            let interval = self.interval_ms_str.parse::<u64>().unwrap_or(1000);
+            let mut settings_clone = settings.clone();
+            settings_clone.interval_ms = interval; // Update with latest UI string
+            self.start_automation(settings_clone);
+        }
+    }
+
     fn start_automation(&mut self, settings: AcceptItemSettings) {
         let running = Arc::clone(&self.running);
         let status = Arc::clone(&self.status);
