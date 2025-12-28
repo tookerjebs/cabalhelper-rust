@@ -123,8 +123,7 @@ impl ImageClickerTool {
                 if self.game_hwnd.is_none() {
                     *self.status.lock().unwrap() = "Connect to game first".to_string();
                 } else {
-                    let interval = self.interval_ms_str.parse::<u64>().unwrap_or(1000);
-                    settings.interval_ms = interval;
+                    // settings.interval_ms is already updated every frame from the UI string (line 106-108)
                     self.start_automation(settings.clone());
                 }
             },
@@ -139,10 +138,8 @@ impl ImageClickerTool {
         if self.game_hwnd.is_none() {
             *self.status.lock().unwrap() = "Connect to game first".to_string();
         } else {
-            let interval = self.interval_ms_str.parse::<u64>().unwrap_or(1000);
-            let mut settings_clone = settings.clone();
-            settings_clone.interval_ms = interval; // Update with latest UI string
-            self.start_automation(settings_clone);
+            // settings.interval_ms is already updated every frame from the UI string (line 106-108)
+            self.start_automation(settings.clone());
         }
     }
 

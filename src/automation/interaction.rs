@@ -69,19 +69,20 @@ pub fn scroll_in_area(
         let center_x = window_rect.0 + left + width / 2;
         let center_y = window_rect.1 + top + height / 2;
         
-        // Move mouse to center of area
-        if let Err(_) = gui.move_mouse_to_pos(center_x as u32, center_y as u32, 0.1) {
+        // Move mouse to center of area (instant, no animation)
+        if let Err(_) = gui.move_mouse_to_pos(center_x as u32, center_y as u32, 0.0) {
             return;
         }
-        delay_ms(50);
+        delay_ms(20);
         
-        // Scroll
+        // Scroll (reduced from 20 to 5 ticks since game only processes ~1 unit anyway)
+        let scroll_ticks = if amount.abs() > 5 { 5 } else { amount.abs() };
         if amount < 0 {
-            for _ in 0..amount.abs() {
+            for _ in 0..scroll_ticks {
                 let _ = gui.scroll_up(120);
             }
         } else {
-            for _ in 0..amount {
+            for _ in 0..scroll_ticks {
                 let _ = gui.scroll_down(120);
             }
         }

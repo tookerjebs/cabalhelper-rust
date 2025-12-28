@@ -3,7 +3,7 @@ use windows::{
     Win32::UI::WindowsAndMessaging::{
         FindWindowA, GetWindowRect, IsWindow, WindowFromPoint, GetCursorPos, GetAncestor, GA_PARENT
     },
-    Win32::Graphics::Gdi::ScreenToClient,
+    Win32::Graphics::Gdi::{ScreenToClient, GetDC, GetPixel, ReleaseDC},
 };
 
 /// Find game window
@@ -111,3 +111,32 @@ pub fn is_game_window_or_child(check_hwnd: HWND, game_hwnd: HWND) -> bool {
     }
     false
 }
+
+/// Get the RGB color of a pixel at screen coordinates
+/// Returns (R, G, B) as u8 values
+pub fn get_pixel_color(screen_x: i32, screen_y: i32) -> Option<(u8, u8, u8)> {
+    unsafe {
+        // Get device context for the entire screen
+        let hdc = GetDC(HWND(0));
+        if hdc.is_invalid() {
+            return None;
+        }
+        
+        // Get pixel color as COLORREF (0x00BBGGRR format)
+        let color = GetPixel(hdc, screen_x, screen_y);
+        
+        // Release the device context
+        let _ = ReleaseDC(HWND(0), hdc);
+        
+        // Convert COLORREF to u32 for bitwise operations
+        // COLORREF format: 0x00BBGGRR
+        let color_val = color.0 as u32;
+        let r = (color_val & 0xFF) as u8;
+        let g = ((color_val >> 8) & 0xFF) as u8;
+        let b = ((color_val >> 16) & 0xFF) as u8;
+        
+        Some((r, g, b))
+    }
+}
+
+

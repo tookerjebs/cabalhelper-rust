@@ -6,7 +6,7 @@ use crate::settings::CollectionFillerSettings;
 use crate::tools::r#trait::Tool;
 use crate::calibration::CalibrationManager;
 use crate::automation::context::AutomationContext;
-use crate::automation::detection::find_stored_template;
+use crate::automation::detection::{find_stored_template, is_position_near};
 use crate::automation::interaction::{click_at_screen, delay_ms, scroll_in_area, click_at_window_pos};
 use crate::ui::collection_filler::{CalibrationItem, UiAction, apply_calibration_result, clear_calibration};
 
@@ -191,21 +191,33 @@ fn run_automation_loop(
     status: &Arc<Mutex<String>>
 ) {
      while *running.lock().unwrap() {
-        match find_stored_template(&mut ctx.gui, "tabs_dots", settings.red_dot_tolerance) {
-            Some(dots) if !dots.is_empty() => {
-                let tab_pos = dots[0];
-                *status.lock().unwrap() = "Found tab, clicking...".to_string();
-                click_at_screen(&mut ctx.gui, tab_pos.0, tab_pos.1);
-                delay_ms(settings.delay_ms);
-
-                 process_dungeon_list(ctx, &settings, running, status, tab_pos);
-            },
+        // Find potential tab dots (using lower tolerance to catch all candidates)
+        let potential_dots = match find_stored_template(&mut ctx.gui, "tabs_dots", settings.red_dot_tolerance) {
+            Some(dots) if !dots.is_empty() => dots,
             _ => {
                 *status.lock().unwrap() = "All collections complete!".to_string();
                 break;
             }
+        };
+        
+        // Filter by color to keep only RED dots (not grey dots)
+        let red_dots = crate::automation::detection::filter_red_dots(
+            potential_dots,
+            settings.min_red,
+            settings.red_dominance
+        );
+        
+        if red_dots.is_empty() {
+            *status.lock().unwrap() = "All collections complete!".to_string();
+            break;
         }
+        
+        let tab_pos = red_dots[0];
+        *status.lock().unwrap() = "Found tab, clicking...".to_string();
+        click_at_screen(&mut ctx.gui, tab_pos.0, tab_pos.1);
         delay_ms(settings.delay_ms);
+
+         process_dungeon_list(ctx, &settings, running, status, tab_pos);
      }
 }
 
@@ -274,35 +286,79 @@ fn process_page_dungeons(
     running: &Arc<Mutex<bool>>,
     status: &Arc<Mutex<String>>
 ) -> bool {
-    let mut work_done = false;
-    
-    match find_stored_template(&mut ctx.gui, "dungeon_dots", settings.red_dot_tolerance) {
-        Some(dots) if !dots.is_empty() => {
-             let d_pos = dots[0];
-             click_at_screen(&mut ctx.gui, d_pos.0, d_pos.1);
-             delay_ms(settings.delay_ms);
-             
-             if let Some(items_area) = settings.collection_items_area {
-                 scroll_in_area(&mut ctx.gui, ctx.game_hwnd, items_area, -20);
-             }
-             delay_ms(settings.delay_ms);
-             
-             for _ in 0..50 {
-                 if !*running.lock().unwrap() { break; }
-                 
-                 let _processed = process_visible_items(ctx, settings, running, status);
-                 
-                 if let Some(items_area) = settings.collection_items_area {
-                     scroll_in_area(&mut ctx.gui, ctx.game_hwnd, items_area, 5);
-                 }
-                 delay_ms(settings.delay_ms);
-             }
-             
-             work_done = true;
-        },
-        _ => {}
+    let mut any_work_done = false;
+
+    // Loop until no more red dots found in dungeon list on this page
+    while *running.lock().unwrap() {
+        // Find potential dungeon dots and filter by color
+        let potential_dots = match find_stored_template(&mut ctx.gui, "dungeon_dots", settings.red_dot_tolerance) {
+            Some(dots) if !dots.is_empty() => dots,
+            _ => break // No more dungeons on this page
+        };
+        
+        let red_dots = crate::automation::detection::filter_red_dots(
+            potential_dots,
+            settings.min_red,
+            settings.red_dominance
+        );
+        
+        if red_dots.is_empty() {
+            break; // No red dungeons on this page
+        }
+        
+        let dungeon_dot = red_dots[0];
+
+        // Found a dungeon with a red dot
+        *status.lock().unwrap() = "Processing dungeon...".to_string();
+        click_at_screen(&mut ctx.gui, dungeon_dot.0, dungeon_dot.1);
+        delay_ms(settings.delay_ms);
+
+        // Reset scroll to top
+        if let Some(items_area) = settings.collection_items_area {
+            scroll_in_area(&mut ctx.gui, ctx.game_hwnd, items_area, -20);
+        }
+        delay_ms(settings.delay_ms);
+
+        let max_scroll_passes = 50;
+        let mut dungeon_finished = false;
+
+        for _ in 0..max_scroll_passes {
+            if !*running.lock().unwrap() { break; }
+
+            // 1. Process all visible items at current scroll
+            let _ = process_visible_items(ctx, settings, running, status);
+            any_work_done = true;
+
+            // 2. Double check item area for stragglers (Python logic compliance)
+            let _ = process_visible_items(ctx, settings, running, status);
+
+            // 3. Check if THIS dungeon is complete
+            // We scan the dungeon list again to see if our dungeon_dot is still red
+            let still_active = match find_stored_template(&mut ctx.gui, "dungeon_dots", settings.red_dot_tolerance) {
+                Some(dots) => dots.iter().any(|d| is_position_near(*d, dungeon_dot, 20.0)),
+                None => false
+            };
+
+            if !still_active {
+                dungeon_finished = true;
+                break; // Dungeon done!
+            }
+
+            // 4. Scroll down to find more items
+            if let Some(items_area) = settings.collection_items_area {
+                scroll_in_area(&mut ctx.gui, ctx.game_hwnd, items_area, 5);
+            }
+            delay_ms(settings.delay_ms);
+        }
+
+        if !dungeon_finished {
+            // Safe guard: if we scrolled 50 times and it's still red, maybe we're stuck.
+            // But we break the inner loop to move to next dungeon check (or see it again)
+             *status.lock().unwrap() = "Dungeon timeout/stuck, scanning list again...".to_string();
+        }
     }
-    work_done
+    
+    any_work_done
 }
 
 fn process_visible_items(
@@ -313,17 +369,34 @@ fn process_visible_items(
 ) -> bool {
     let mut processed = false;
     let mut last_pos: Option<(u32, u32)> = None;
+    let mut stuck_hits = 0;
     
     while *running.lock().unwrap() {
-        match find_stored_template(&mut ctx.gui, "items_dots", settings.red_dot_tolerance) {
-            Some(dots) if !dots.is_empty() => {
-                let pos = dots[0];
+        // Find potential item dots and filter by color
+        let potential_dots = match find_stored_template(&mut ctx.gui, "items_dots", settings.red_dot_tolerance) {
+            Some(dots) if !dots.is_empty() => dots,
+            _ => break
+        };
+        
+        let red_dots = crate::automation::detection::filter_red_dots(
+            potential_dots,
+            settings.min_red,
+            settings.red_dominance
+        );
+        
+        match red_dots.first() {
+            Some(&pos) => {
                 
+                // Stuck check
                 if let Some(last) = last_pos {
-                     let dist = ((pos.0 as f32 - last.0 as f32).powi(2) + (pos.1 as f32 - last.1 as f32).powi(2)).sqrt();
-                     if dist < 5.0 {
-                         *status.lock().unwrap() = "Stuck on item, skipping".to_string();
-                         break;
+                     if is_position_near(pos, last, 5.0) {
+                         stuck_hits += 1;
+                         if stuck_hits >= 3 {
+                             *status.lock().unwrap() = "Stuck on item, skipping".to_string();
+                             break;
+                         }
+                     } else {
+                         stuck_hits = 0;
                      }
                 }
                 last_pos = Some(pos);
@@ -340,9 +413,9 @@ fn process_visible_items(
                 }
                 
                 processed = true;
-                delay_ms(settings.delay_ms * 2);
+                delay_ms(settings.delay_ms); 
             },
-            _ => break
+            None => break
         }
     }
     processed

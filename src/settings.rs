@@ -33,6 +33,12 @@ pub struct CollectionFillerSettings {
     pub delay_ms: u64,
     #[serde(default = "default_red_dot_tolerance")]
     pub red_dot_tolerance: f32,
+    
+    // Color filtering settings (to distinguish red dots from grey dots)
+    #[serde(default = "default_min_red")]
+    pub min_red: u8,
+    #[serde(default = "default_red_dominance")]
+    pub red_dominance: u8,
 }
 
 impl Default for CollectionFillerSettings {
@@ -50,8 +56,22 @@ impl Default for CollectionFillerSettings {
             arrow_right_pos: None,
             delay_ms: 31,
             red_dot_tolerance: 0.85,
+            min_red: 150,
+            red_dominance: 30,
         }
     }
+}
+
+fn default_red_dot_tolerance() -> f32 {
+    0.85
+}
+
+fn default_min_red() -> u8 {
+    150
+}
+
+fn default_red_dominance() -> u8 {
+    30
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,16 +101,13 @@ impl Default for AcceptItemSettings {
     fn default() -> Self {
         Self {
             image_path: "image.png".to_string(),
-            interval_ms: 1000,
+            interval_ms: 100,  // Reduced from 1000ms for faster detection
             tolerance: 0.85, 
             search_region: None,
         }
     }
 }
 
-fn default_red_dot_tolerance() -> f32 {
-    0.85
-}
 
 impl AppSettings {
     const SETTINGS_FILE: &'static str = "cabalhelper_settings.json";
