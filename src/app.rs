@@ -81,9 +81,11 @@ impl eframe::App for CabalHelperApp {
             // Auto-Snap Logic: Track Game Window
             if let Some(game_hwnd) = self.game_hwnd {
                 if let Some((x, y, w, _h)) = crate::core::window::get_window_rect(game_hwnd) {
-                     // Overlay Size is 220x52
-                     // Target: Top-Right of Game Window, with -10px padding
-                     let target_x = x + w - 220 - 16; // -16 for window border/padding safety
+                     // Overlay Size is ~200x47 (10% smaller than 220x52)
+                     // Target: Center-Top of Game Window
+                     // Center X = x + (w / 2) - (overlay_width / 2)
+                     let overlay_w = 200;
+                     let target_x = x + (w / 2) - (overlay_w / 2);
                      let target_y = y + 8; // +8 for title bar padding
                      
                      // Send command to move window
@@ -122,10 +124,10 @@ impl eframe::App for CabalHelperApp {
                         let tool_btn = |ui: &mut egui::Ui, text: &str, is_running: bool| -> bool {
                             let btn = egui::Button::new(
                                 egui::RichText::new(text)
-                                    .size(20.0)
+                                    .size(18.0) // Slightly smaller font
                                     .strong()
                                     .color(if is_running { egui::Color32::GREEN } else { egui::Color32::WHITE })
-                            ).min_size(egui::vec2(48.0, 48.0)); // Slightly less than 52 to fit padding
+                            ).min_size(egui::vec2(43.0, 43.0)); // 10% smaller buttons
                             
                             ui.add(btn).clicked()
                         };
@@ -168,8 +170,8 @@ impl eframe::App for CabalHelperApp {
 
                         // Back Button
                          let btn = egui::Button::new(
-                                egui::RichText::new("🔙").size(16.0)
-                            ).min_size(egui::vec2(32.0, 48.0));
+                                egui::RichText::new("🔙").size(14.0)
+                            ).min_size(egui::vec2(28.0, 43.0));
                             
                         if ui.add(btn).clicked() {
                             // Stop everything when closing overlay? Or keep running?
@@ -209,8 +211,8 @@ impl eframe::App for CabalHelperApp {
                         self.is_overlay_mode = true;
                         ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(false));
                         ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::AlwaysOnTop));
-                        // 4 buttons (3 tools + 1 back) * 52px width approx
-                        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([220.0, 52.0].into()));
+                        // Scaled down size: 200x47
+                        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([200.0, 47.0].into()));
                     },
                     crate::ui::app_header::HeaderAction::None => {}
                 }
