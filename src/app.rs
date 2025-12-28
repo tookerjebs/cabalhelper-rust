@@ -77,6 +77,22 @@ impl eframe::App for CabalHelperApp {
         let mut panel = egui::CentralPanel::default();
         if self.is_overlay_mode {
             panel = panel.frame(egui::Frame::none().fill(egui::Color32::TRANSPARENT));
+            
+            // Auto-Snap Logic: Track Game Window
+            if let Some(game_hwnd) = self.game_hwnd {
+                if let Some((x, y, w, _h)) = crate::core::window::get_window_rect(game_hwnd) {
+                     // Overlay Size is 220x52
+                     // Target: Top-Right of Game Window, with -10px padding
+                     let target_x = x + w - 220 - 16; // -16 for window border/padding safety
+                     let target_y = y + 8; // +8 for title bar padding
+                     
+                     // Send command to move window
+                     // Note: To avoid jitter, we might want to check current pos first, 
+                     // but egui doesn't give us window pos easily in update().
+                     // We just send the command. Windows OS handles it efficiently if it's the same.
+                     ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition([target_x as f32, target_y as f32].into()));
+                }
+            }
         }
 
         panel.show(ctx, |ui| {

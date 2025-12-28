@@ -45,7 +45,9 @@ pub fn get_window_rect(hwnd: HWND) -> Option<(i32, i32, i32, i32)> {
     unsafe {
         let mut rect = windows::Win32::Foundation::RECT::default();
         if GetWindowRect(hwnd, &mut rect).is_ok() {
-            Some((rect.left, rect.top, rect.right, rect.bottom))
+            let width = rect.right - rect.left;
+            let height = rect.bottom - rect.top;
+            Some((rect.left, rect.top, width, height))
         } else {
             None
         }

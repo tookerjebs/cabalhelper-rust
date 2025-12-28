@@ -11,6 +11,7 @@ use crate::ui::heil_clicker::{HeilUiAction, render_ui};
 pub struct HeilClickerTool {
     // UI state
     delay_ms_str: String,
+    settings_synced: bool,
     
     // Runtime state
     running: Arc<Mutex<bool>>,
@@ -25,6 +26,7 @@ impl Default for HeilClickerTool {
     fn default() -> Self {
         Self {
             delay_ms_str: "200".to_string(),
+            settings_synced: false,
             running: Arc::new(Mutex::new(false)),
             status: Arc::new(Mutex::new("Ready - Click 'Calibrate' to set click position".to_string())),
             game_hwnd: None,
@@ -62,10 +64,9 @@ impl Tool for HeilClickerTool {
 impl HeilClickerTool {
     pub fn update(&mut self, ui: &mut egui::Ui, settings: &mut HeilClickerSettings) {
         // Sync setting string if needed (on first load)
-        if self.delay_ms_str != settings.interval_ms.to_string() && !ui.ctx().is_using_pointer() {
-             // Only update from settings if user isn't typing (simple check)
-             // simplified: just init on load, but we don't have load event here easily.
-             // We'll trust the string for UI and parse it back to settings.
+        if !self.settings_synced {
+            self.delay_ms_str = settings.interval_ms.to_string();
+            self.settings_synced = true;
         }
 
         // Handle calibration interaction
@@ -91,6 +92,11 @@ impl HeilClickerTool {
             &status, 
             self.game_hwnd.is_some()
         );
+
+        // Update settings from string buffer immediately
+        if let Ok(val) = self.delay_ms_str.parse::<u64>() {
+            settings.interval_ms = val;
+        }
 
         match action {
             HeilUiAction::StartCalibration => {

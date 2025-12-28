@@ -16,9 +16,6 @@ pub fn find_stored_template(
                 .map(|(x, y, _score)| (*x, *y))
                 .collect();
             
-            let elapsed = start_time.elapsed();
-            println!("🕐 find_stored_template('{}') took: {:?}, found {} matches", alias, elapsed, filtered.len());
-            
             if filtered.is_empty() {
                 None
             } else {
@@ -26,12 +23,9 @@ pub fn find_stored_template(
             }
         },
         Ok(None) => {
-            let elapsed = start_time.elapsed();
-            println!("🕐 find_stored_template('{}') took: {:?}, found 0 matches", alias, elapsed);
             None
         },
-        Err(e) => {
-            println!("Error finding template '{}': {}", alias, e);
+        Err(_) => {
             None
         }
     }

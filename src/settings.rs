@@ -101,17 +101,14 @@ impl AppSettings {
             Ok(contents) => {
                 match serde_json::from_str(&contents) {
                     Ok(settings) => {
-                        println!("✓ Loaded settings from {}", Self::SETTINGS_FILE);
                         settings
                     },
-                    Err(e) => {
-                        println!("⚠️ Failed to parse settings: {}, using defaults", e);
+                    Err(_) => {
                         Self::default()
                     }
                 }
             },
             Err(_) => {
-                println!("No settings file found, using defaults");
                 Self::default()
             }
         }
@@ -128,10 +125,8 @@ impl AppSettings {
         Ok(())
     }
     
-    /// Auto-save (ignores errors, just logs)
+    /// Auto-save (ignores errors)
     pub fn auto_save(&self) {
-        if let Err(e) = self.save() {
-            println!("⚠️ Auto-save failed: {}", e);
-        }
+        let _ = self.save();
     }
 }

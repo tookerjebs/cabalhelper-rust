@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 mod core;
 mod tools;
 mod app;

@@ -13,6 +13,7 @@ use crate::ui::image_clicker::{ImageUiAction, render_ui};
 pub struct ImageClickerTool {
     // UI state
     interval_ms_str: String,
+    settings_synced: bool,
     
     // Runtime state
     running: Arc<Mutex<bool>>,
@@ -27,6 +28,7 @@ impl Default for ImageClickerTool {
     fn default() -> Self {
         Self {
             interval_ms_str: "1000".to_string(),
+            settings_synced: false,
             running: Arc::new(Mutex::new(false)),
             status: Arc::new(Mutex::new("Ready".to_string())),
             game_hwnd: None,
@@ -61,6 +63,12 @@ impl Tool for ImageClickerTool {
 
 impl ImageClickerTool {
     pub fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut AcceptItemSettings) {
+        // Sync UI with Settings on first load
+        if !self.settings_synced {
+            self.interval_ms_str = settings.interval_ms.to_string();
+            self.settings_synced = true;
+        }
+
         // Handle calibration interaction
         if let Some(hwnd) = self.game_hwnd {
             if let Some(result) = self.calibration.handle_clicks(hwnd) {
@@ -93,6 +101,11 @@ impl ImageClickerTool {
             &status,
             self.game_hwnd.is_some(),
         );
+
+        // Update settings from string buffer immediately
+        if let Ok(val) = self.interval_ms_str.parse::<u64>() {
+            settings.interval_ms = val;
+        }
 
         match action {
             ImageUiAction::StartRegionCalibration => {

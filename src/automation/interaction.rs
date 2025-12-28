@@ -15,8 +15,7 @@ pub fn click_at_screen(gui: &mut RustAutoGui, x: u32, y: u32) {
     // Python does 2 click attempts with 50ms delay
     for attempt in 0..2 {
         // Move mouse to position (screen coordinates)
-        if let Err(e) = gui.move_mouse_to_pos(x, y, 0.0) {
-            println!("Failed to move mouse (attempt {}): {}", attempt + 1, e);
+        if let Err(_) = gui.move_mouse_to_pos(x, y, 0.0) {
             if attempt == 0 {
                 thread::sleep(Duration::from_millis(50));
                 continue;
@@ -28,8 +27,7 @@ pub fn click_at_screen(gui: &mut RustAutoGui, x: u32, y: u32) {
         thread::sleep(Duration::from_millis(20));
         
         // Perform physical left click
-        if let Err(e) = gui.left_click() {
-            println!("Failed to click (attempt {}): {}", attempt + 1, e);
+        if let Err(_) = gui.left_click() {
             if attempt == 0 {
                 thread::sleep(Duration::from_millis(50));
                 continue;
@@ -72,8 +70,7 @@ pub fn scroll_in_area(
         let center_y = window_rect.1 + top + height / 2;
         
         // Move mouse to center of area
-        if let Err(e) = gui.move_mouse_to_pos(center_x as u32, center_y as u32, 0.1) {
-            println!("Failed to move for scroll: {}", e);
+        if let Err(_) = gui.move_mouse_to_pos(center_x as u32, center_y as u32, 0.1) {
             return;
         }
         delay_ms(50);
