@@ -1,9 +1,10 @@
 use windows::{
     Win32::Foundation::{HWND, POINT},
     Win32::UI::WindowsAndMessaging::{
-        FindWindowA, GetWindowRect, IsWindow, WindowFromPoint, GetCursorPos, GetAncestor, GA_PARENT
+        FindWindowA, GetWindowRect, IsWindow, WindowFromPoint, GetCursorPos, GetAncestor, GA_PARENT,
+        GetClientRect,
     },
-    Win32::Graphics::Gdi::{ScreenToClient, GetDC, GetPixel, ReleaseDC},
+    Win32::Graphics::Gdi::{ScreenToClient, ClientToScreen, GetDC, GetPixel, ReleaseDC},
 };
 
 /// Find game window
@@ -51,6 +52,34 @@ pub fn get_window_rect(hwnd: HWND) -> Option<(i32, i32, i32, i32)> {
         } else {
             None
         }
+    }
+}
+
+/// Get client area rectangle in screen coordinates (excludes borders/title bar)
+pub fn get_client_rect_in_screen_coords(hwnd: HWND) -> Option<(i32, i32, i32, i32)> {
+    unsafe {
+        // 1. Get the size of the inner content area
+        let mut client_rect = windows::Win32::Foundation::RECT::default();
+        if GetClientRect(hwnd, &mut client_rect).is_err() {
+            return None;
+        }
+
+        // 2. Convert (0,0) of client area to Screen Coordinates
+        let mut top_left = POINT { x: 0, y: 0 };
+        if !ClientToScreen(hwnd, &mut top_left).as_bool() {
+            return None;
+        }
+
+        // 3. Convert bottom-right
+        let mut bottom_right = POINT { x: client_rect.right, y: client_rect.bottom };
+        ClientToScreen(hwnd, &mut bottom_right);
+
+        Some((
+            top_left.x,
+            top_left.y,
+            bottom_right.x - top_left.x, // Width
+            bottom_right.y - top_left.y  // Height
+        ))
     }
 }
 

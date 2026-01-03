@@ -1,6 +1,7 @@
 use rustautogui::{RustAutoGui, MatchMode};
 use windows::Win32::Foundation::HWND;
-use crate::core::window::get_window_rect;
+use crate::core::window::get_client_rect_in_screen_coords;
+
 
 /// Automation context that encapsulates common automation setup
 pub struct AutomationContext {
@@ -15,8 +16,10 @@ impl AutomationContext {
         let gui = RustAutoGui::new(false)
             .map_err(|e| format!("Failed to initialize RustAutoGui: {}", e))?;
         
-        let window_rect = get_window_rect(game_hwnd)
-            .ok_or_else(|| "Failed to get window position".to_string())?;
+        // Use Client Rect (inner content) to be robust against window border differences
+        let window_rect = get_client_rect_in_screen_coords(game_hwnd)
+            .ok_or_else(|| "Failed to get window client area".to_string())?;
+
         
         Ok(Self {
             gui,
