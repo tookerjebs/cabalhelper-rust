@@ -51,6 +51,9 @@ pub struct CabalHelperApp {
     // Optimization state
     last_window_check: std::time::Instant,
     last_esc_check: std::time::Instant,
+    
+    // Position caching for smart repaint
+    last_overlay_pos: Option<(f32, f32)>,
 }
 
 impl Default for CabalHelperApp {
@@ -69,6 +72,7 @@ impl Default for CabalHelperApp {
             is_overlay_mode: false,
             last_window_check: std::time::Instant::now(),
             last_esc_check: std::time::Instant::now(),
+            last_overlay_pos: None,
         }
     }
 }
@@ -119,19 +123,27 @@ impl eframe::App for CabalHelperApp {
             
             // Auto-Snap Logic: Track Game Window
             if let Some(game_hwnd) = self.game_hwnd {
-                if let Some((x, y, w, _h)) = crate::core::window::get_window_rect(game_hwnd) {
-                     // Overlay Size is ~200x47 (10% smaller than 220x52)
-                     // Target: Center-Top of Game Window
-                     // Center X = x + (w / 2) - (overlay_width / 2)
+                // Use client rect (inner content) to correctly position inside the window frame
+                if let Some((x, y, w, _h)) = crate::core::window::get_client_rect_in_screen_coords(game_hwnd) {
+                     // Overlay Size is ~200x47
+                     // Target: Center-Top of Game Window Client Area
                      let overlay_w = 200;
                      let target_x = x + (w / 2) - (overlay_w / 2);
-                     let target_y = y + 8; // +8 for title bar padding
+                     let target_y = y as f32; // Top of the client area (below title bar)
                      
-                     // Send command to move window
-                     // Note: To avoid jitter, we might want to check current pos first, 
-                     // but egui doesn't give us window pos easily in update().
-                     // We just send the command. Windows OS handles it efficiently if it's the same.
-                     ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition([target_x as f32, target_y as f32].into()));
+                     // Optimization: Only move if position changed significantly (> 1.0 pixel)
+                     // This prevents spamming Windows API and reduces Idle CPU usage
+                     let should_move = match self.last_overlay_pos {
+                         Some((last_x, last_y)) => {
+                             (last_x - target_x as f32).abs() > 1.0 || (last_y - target_y).abs() > 1.0
+                         },
+                         None => true
+                     };
+
+                     if should_move {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition([target_x as f32, target_y].into()));
+                        self.last_overlay_pos = Some((target_x as f32, target_y));
+                     }
                 }
             }
         }
@@ -151,22 +163,23 @@ impl eframe::App for CabalHelperApp {
                 painter.rect_filled(
                     response.rect,
                     egui::Rounding::same(8.0),
-                    egui::Color32::from_black_alpha(200)
+                    egui::Color32::TRANSPARENT // Fully transparent background as requested
                 );
                 
                 // Use a horizontal layout for the dock
                 ui.allocate_ui_at_rect(response.rect, |ui| {
                     ui.horizontal(|ui| {
-                        ui.style_mut().spacing.item_spacing = egui::vec2(2.0, 0.0);
+                        // INCREASED SPACING: from 2.0 to 6.0
+                        ui.style_mut().spacing.item_spacing = egui::vec2(6.0, 0.0);
                         
                         // Helper to create tool buttons
                         let tool_btn = |ui: &mut egui::Ui, text: &str, is_running: bool| -> bool {
                             let btn = egui::Button::new(
                                 egui::RichText::new(text)
-                                    .size(18.0) // Slightly smaller font
+                                    .size(17.0) 
                                     .strong()
                                     .color(if is_running { egui::Color32::GREEN } else { egui::Color32::WHITE })
-                            ).min_size(egui::vec2(43.0, 43.0)); // 10% smaller buttons
+                            ).min_size(egui::vec2(40.0, 40.0)); // REDUCED SIZE: from 43 to 40 (~5% smaller)
                             
                             ui.add(btn).clicked()
                         };
@@ -206,14 +219,26 @@ impl eframe::App for CabalHelperApp {
             } else {
                 // Normal View
                 
-                // Global Header
-                let header_action = crate::ui::app_header::render_header(
+                // Global Header (minimal)
+                let header_action = crate::ui::app_header::render_header(ui);
+                
+                ui.separator();
+                
+                // Connection Panel (detailed)
+                let connection_action = crate::ui::app_header::render_connection_panel(
                     ui,
                     &mut self.game_hwnd,
                     &mut self.game_title
                 );
                 
-                match header_action {
+                // Handle both actions
+                let action = if matches!(connection_action, crate::ui::app_header::HeaderAction::None) {
+                    header_action
+                } else {
+                    connection_action
+                };
+                
+                match action {
                     crate::ui::app_header::HeaderAction::Connect(hwnd) => {
                         for_each_tool!(self, set_game_hwnd, Some(hwnd));
                     },

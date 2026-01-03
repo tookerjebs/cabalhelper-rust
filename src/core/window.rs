@@ -2,34 +2,30 @@ use windows::{
     Win32::Foundation::{HWND, POINT},
     Win32::UI::WindowsAndMessaging::{
         FindWindowA, GetWindowRect, IsWindow, WindowFromPoint, GetCursorPos, GetAncestor, GA_PARENT,
-        GetClientRect,
+        GetClientRect, GetWindowTextA,
     },
     Win32::Graphics::Gdi::{ScreenToClient, ClientToScreen, GetDC, GetPixel, ReleaseDC},
 };
 
 /// Find game window
-/// Priority 1: Window with title "PlayCabal EP36"
-/// Priority 2: Window with class name "D3D Window" (legacy/fallback)
-pub fn find_game_window() -> Option<HWND> {
+/// Searches for "D3D Window" class (universal for all Cabal versions)
+pub fn find_game_window() -> Option<(HWND, String)> {
     unsafe {
-        // 1. Try to find by specific Window Title
-        let hwnd_by_title = FindWindowA(
-            windows::core::PCSTR::null(),
-            windows::core::PCSTR("PlayCabal EP36\0".as_ptr()),
-        );
-
-        if hwnd_by_title.0 != 0 && IsWindow(hwnd_by_title).as_bool() {
-            return Some(hwnd_by_title);
-        }
-
-        // 2. Fallback: Try to find by class name "D3D Window"
-        let hwnd_by_class = FindWindowA(
+        let hwnd = FindWindowA(
             windows::core::PCSTR("D3D Window\0".as_ptr()),
             windows::core::PCSTR::null(),
         );
-
-        if hwnd_by_class.0 != 0 && IsWindow(hwnd_by_class).as_bool() {
-            Some(hwnd_by_class)
+        
+        if hwnd.0 != 0 && IsWindow(hwnd).as_bool() {
+            // Get actual window title
+            let mut buffer = [0u8; 256];
+            let len = GetWindowTextA(hwnd, &mut buffer);
+            let title = if len > 0 {
+                String::from_utf8_lossy(&buffer[..len as usize]).to_string()
+            } else {
+                "D3D Window".to_string()
+            };
+            Some((hwnd, title))
         } else {
             None
         }
