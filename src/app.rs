@@ -7,6 +7,28 @@ use crate::core::window::is_window_valid;
 use crate::settings::AppSettings;
 use windows::Win32::Foundation::HWND;
 
+// Macro to apply an operation to all tools
+macro_rules! for_each_tool {
+    ($self:expr, $method:ident $(, $arg:expr)*) => {
+        $self.heil_clicker.$method($($arg),*);
+        $self.collection_filler.$method($($arg),*);
+        $self.image_clicker.$method($($arg),*);
+    };
+}
+
+// Macro to toggle a tool with mutual exclusion
+macro_rules! toggle_tool_exclusive {
+    ($self:expr, $tool:ident, $settings:expr, $ctx:expr) => {
+        if $self.$tool.is_running() {
+            $self.$tool.stop();
+        } else {
+            for_each_tool!($self, stop);
+            $self.$tool.start($settings);
+        }
+        $ctx.request_repaint();
+    };
+}
+
 pub struct CabalHelperApp {
     // Current valid tools
     heil_clicker: HeilClickerTool,
@@ -74,9 +96,7 @@ impl eframe::App for CabalHelperApp {
         use crate::core::input::is_escape_key_down;
         if self.last_esc_check.elapsed() > std::time::Duration::from_millis(100) {
             if is_escape_key_down() {
-                self.heil_clicker.stop();
-                self.collection_filler.stop();
-                self.image_clicker.stop();
+                for_each_tool!(self, stop);
             }
             self.last_esc_check = std::time::Instant::now();
         }
@@ -87,9 +107,7 @@ impl eframe::App for CabalHelperApp {
                 if !is_window_valid(hwnd) {
                     self.game_hwnd = None;
                     self.game_title = "Connection Lost".to_string();
-                    self.heil_clicker.set_game_hwnd(None);
-                    self.collection_filler.set_game_hwnd(None);
-                    self.image_clicker.set_game_hwnd(None);
+                    for_each_tool!(self, set_game_hwnd, None);
                 }
             }
             self.last_window_check = std::time::Instant::now();
@@ -155,39 +173,17 @@ impl eframe::App for CabalHelperApp {
 
                         // 1. Heil Clicker
                         if tool_btn(ui, "1", self.heil_clicker.is_running()) {
-                           if self.heil_clicker.is_running() {
-                               self.heil_clicker.stop();
-                           } else {
-                               // Stop others first (Mutual Exclusion)
-                               self.collection_filler.stop();
-                               self.image_clicker.stop();
-                               self.heil_clicker.start(&self.settings.heil_clicker); 
-                           }
-                           ctx.request_repaint(); // Immediate visual update
+                            toggle_tool_exclusive!(self, heil_clicker, &self.settings.heil_clicker, ctx);
                         }
 
                         // 2. Collection Filler
                         if tool_btn(ui, "2", self.collection_filler.is_running()) {
-                           if self.collection_filler.is_running() {
-                               self.collection_filler.stop();
-                           } else {
-                               self.heil_clicker.stop();
-                               self.image_clicker.stop();
-                               self.collection_filler.start(&self.settings.collection_filler);
-                           }
-                           ctx.request_repaint(); // Immediate visual update
+                            toggle_tool_exclusive!(self, collection_filler, &self.settings.collection_filler, ctx);
                         }
 
                         // 3. Accept Item
                         if tool_btn(ui, "3", self.image_clicker.is_running()) {
-                           if self.image_clicker.is_running() {
-                               self.image_clicker.stop();
-                           } else {
-                               self.heil_clicker.stop();
-                               self.collection_filler.stop();
-                               self.image_clicker.start(&self.settings.accept_item);
-                           }
-                           ctx.request_repaint(); // Immediate visual update
+                            toggle_tool_exclusive!(self, image_clicker, &self.settings.accept_item, ctx);
                         }
 
                         ui.separator();
@@ -219,14 +215,10 @@ impl eframe::App for CabalHelperApp {
                 
                 match header_action {
                     crate::ui::app_header::HeaderAction::Connect(hwnd) => {
-                        self.heil_clicker.set_game_hwnd(Some(hwnd));
-                        self.collection_filler.set_game_hwnd(Some(hwnd));
-                        self.image_clicker.set_game_hwnd(Some(hwnd));
+                        for_each_tool!(self, set_game_hwnd, Some(hwnd));
                     },
                     crate::ui::app_header::HeaderAction::Disconnect => {
-                        self.heil_clicker.set_game_hwnd(None);
-                        self.collection_filler.set_game_hwnd(None);
-                        self.image_clicker.set_game_hwnd(None);
+                        for_each_tool!(self, set_game_hwnd, None);
                     },
                     crate::ui::app_header::HeaderAction::Save => {
                         self.settings.auto_save();
