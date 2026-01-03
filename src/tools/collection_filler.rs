@@ -1,5 +1,4 @@
 use std::sync::{Arc, Mutex};
-use std::thread;
 use eframe::egui;
 use windows::Win32::Foundation::HWND;
 use crate::settings::CollectionFillerSettings;
@@ -9,12 +8,11 @@ use crate::automation::context::AutomationContext;
 use crate::automation::detection::{find_stored_template, is_position_near};
 use crate::automation::interaction::{click_at_screen, delay_ms, scroll_in_area, click_at_window_pos};
 use crate::ui::collection_filler::{CalibrationItem, UiAction, apply_calibration_result, clear_calibration};
+use crate::core::worker::Worker;
 
 pub struct CollectionFillerTool {
-    // Runtime state
-    running: Arc<Mutex<bool>>,
-    status: Arc<Mutex<String>>,
-    game_hwnd: Option<HWND>,
+    // Runtime state (Worker)
+    worker: Worker,
     
     // Calibration
     calibration: CalibrationManager,
@@ -27,9 +25,7 @@ pub struct CollectionFillerTool {
 impl Default for CollectionFillerTool {
     fn default() -> Self {
         Self {
-            running: Arc::new(Mutex::new(false)),
-            status: Arc::new(Mutex::new("Ready - Calibrate all items before starting".to_string())),
-            game_hwnd: None,
+            worker: Worker::new(),
             calibration: CalibrationManager::new(),
             calibrating_item: None,
             red_dot_path: "red-dot.png".to_string(),
@@ -38,44 +34,46 @@ impl Default for CollectionFillerTool {
 }
 
 impl Tool for CollectionFillerTool {
-    fn set_game_hwnd(&mut self, hwnd: Option<HWND>) {
-        self.game_hwnd = hwnd;
-        if hwnd.is_none() {
-            *self.running.lock().unwrap() = false;
-            self.calibration.cancel();
-            self.calibrating_item = None;
-            *self.status.lock().unwrap() = "Disconnected".to_string();
+    fn stop(&mut self) {
+        self.worker.stop();
+        if self.worker.get_status().contains("Stopped") {
+             // Already stopped
+        } else {
+             self.worker.set_status("Stopped (ESC pressed)");
         }
     }
 
-    fn stop(&mut self) {
-        *self.running.lock().unwrap() = false;
-        *self.status.lock().unwrap() = "Stopped (ESC pressed)".to_string();
-    }
-
     fn is_running(&self) -> bool {
-        *self.running.lock().unwrap()
+        self.worker.is_running()
     }
 
     fn get_status(&self) -> String {
-        self.status.lock().unwrap().clone()
+        self.worker.get_status()
     }
 }
 
 impl CollectionFillerTool {
-    pub fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut CollectionFillerSettings) {
+    pub fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut CollectionFillerSettings, game_hwnd: Option<HWND>) {
         // Handle calibration interaction
-        if let Some(hwnd) = self.game_hwnd {
+        if let Some(hwnd) = game_hwnd {
             if let Some(result) = self.calibration.handle_clicks(hwnd) {
                 if let Some(item) = self.calibrating_item.take() {
                     apply_calibration_result(result, item, settings);
-                    *self.status.lock().unwrap() = "Calibration recorded".to_string();
+                    self.worker.set_status("Calibration recorded");
                 }
             }
+        } else {
+             // Disconnected logic
+             if self.worker.is_running() {
+                 self.worker.stop();
+                 self.worker.set_status("Disconnected");
+             }
+             self.calibration.cancel();
+             self.calibrating_item = None;
         }
 
-        let is_running = *self.running.lock().unwrap();
-        let status = self.status.lock().unwrap().clone();
+        let is_running = self.worker.is_running();
+        let status = self.worker.get_status();
         
         // Render UI and get action
         let action = crate::ui::collection_filler::render_ui(
@@ -86,7 +84,7 @@ impl CollectionFillerTool {
             &self.calibrating_item,
             is_running,
             &status,
-            self.game_hwnd.is_some(),
+            game_hwnd.is_some(),
         );
 
         // Handle action
@@ -95,25 +93,30 @@ impl CollectionFillerTool {
                 self.calibrating_item = Some(item.clone());
                 if is_area {
                     self.calibration.start_area();
-                    *self.status.lock().unwrap() = "Click TOP-LEFT corner".to_string();
+                    self.worker.set_status("Click TOP-LEFT corner");
                 } else {
                     self.calibration.start_point();
-                    *self.status.lock().unwrap() = "Click the button".to_string();
+                    self.worker.set_status("Click the button");
                 }
             },
             UiAction::CancelCalibration => {
                 self.calibration.cancel();
                 self.calibrating_item = None;
-                *self.status.lock().unwrap() = "Calibration cancelled".to_string();
+                self.worker.set_status("Calibration cancelled");
             },
             UiAction::ClearCalibration(item) => {
                  clear_calibration(item, settings);
             },
             UiAction::StartAutomation => {
                 if self.is_fully_calibrated(settings) {
-                    self.start_automation(settings.clone());
+                    // Need game_hwnd here
+                    if let Some(hwnd) = game_hwnd {
+                        self.start_automation(settings.clone(), hwnd);
+                    } else {
+                         self.worker.set_status("Connect to game first");
+                    }
                 } else {
-                    *self.status.lock().unwrap() = "Please calibrate all required items first".to_string();
+                    self.worker.set_status("Please calibrate all required items first");
                 }
             },
             UiAction::StopAutomation => {
@@ -132,24 +135,23 @@ impl CollectionFillerTool {
         settings.yes_pos.is_some()
     }
 
-    pub fn start(&mut self, settings: &CollectionFillerSettings) {
+    pub fn start(&mut self, settings: &CollectionFillerSettings, game_hwnd: Option<HWND>) {
         if self.is_fully_calibrated(settings) {
-            self.start_automation(settings.clone());
+            if let Some(hwnd) = game_hwnd {
+                self.start_automation(settings.clone(), hwnd);
+            } else {
+                 self.worker.set_status("Connect to game first");
+            }
         } else {
-            *self.status.lock().unwrap() = "Please calibrate all required items first".to_string();
+            self.worker.set_status("Please calibrate all required items first");
         }
     }
 
-    fn start_automation(&mut self, settings: CollectionFillerSettings) {
-        let running = Arc::clone(&self.running);
-        let status = Arc::clone(&self.status);
-        let game_hwnd = self.game_hwnd.unwrap();
+    fn start_automation(&mut self, settings: CollectionFillerSettings, game_hwnd: HWND) {
+        self.worker.set_status("Starting automation...");
         let red_dot_path = self.red_dot_path.clone();
 
-        *running.lock().unwrap() = true;
-        *status.lock().unwrap() = "Starting automation...".to_string();
-
-        thread::spawn(move || {
+        self.worker.start(move |running: Arc<Mutex<bool>>, status: Arc<Mutex<String>>| {
             let mut ctx = match AutomationContext::new(game_hwnd) {
                 Ok(c) => c,
                 Err(e) => {

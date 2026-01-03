@@ -3,8 +3,7 @@ use windows::Win32::Foundation::HWND;
 
 /// Common interface that all tools must implement
 pub trait Tool {
-    /// Set the game window handle
-    fn set_game_hwnd(&mut self, hwnd: Option<HWND>);
+
     
     /// Stop the tool (emergency stop)
     fn stop(&mut self);

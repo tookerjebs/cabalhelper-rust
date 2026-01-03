@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-use std::thread;
 use eframe::egui;
 use windows::Win32::Foundation::HWND;
 use crate::settings::AcceptItemSettings;
@@ -9,16 +7,16 @@ use crate::automation::context::AutomationContext;
 use crate::automation::detection::find_stored_template;
 use crate::automation::interaction::delay_ms;
 use crate::ui::image_clicker::{ImageUiAction, render_ui};
+use crate::core::worker::Worker;
+use std::sync::{Arc, Mutex};
 
 pub struct ImageClickerTool {
     // UI state
     interval_ms_str: String,
     settings_synced: bool,
     
-    // Runtime state
-    running: Arc<Mutex<bool>>,
-    status: Arc<Mutex<String>>,
-    game_hwnd: Option<HWND>,
+    // Runtime state (Worker)
+    worker: Worker,
     
     // Calibration
     calibration: CalibrationManager,
@@ -29,40 +27,33 @@ impl Default for ImageClickerTool {
         Self {
             interval_ms_str: "1000".to_string(),
             settings_synced: false,
-            running: Arc::new(Mutex::new(false)),
-            status: Arc::new(Mutex::new("Ready".to_string())),
-            game_hwnd: None,
+            worker: Worker::new(),
             calibration: CalibrationManager::new(),
         }
     }
 }
 
 impl Tool for ImageClickerTool {
-    fn set_game_hwnd(&mut self, hwnd: Option<HWND>) {
-        self.game_hwnd = hwnd;
-        if hwnd.is_none() {
-            *self.running.lock().unwrap() = false;
-            self.calibration.cancel();
-            *self.status.lock().unwrap() = "Disconnected".to_string();
+    fn stop(&mut self) {
+        self.worker.stop();
+        if self.worker.get_status().contains("Stopped") {
+             // Already stopped
+        } else {
+             self.worker.set_status("Stopped (ESC pressed)");
         }
     }
 
-    fn stop(&mut self) {
-        *self.running.lock().unwrap() = false;
-        *self.status.lock().unwrap() = "Stopped (ESC pressed)".to_string();
-    }
-
     fn is_running(&self) -> bool {
-        *self.running.lock().unwrap()
+        self.worker.is_running()
     }
 
     fn get_status(&self) -> String {
-        self.status.lock().unwrap().clone()
+        self.worker.get_status()
     }
 }
 
 impl ImageClickerTool {
-    pub fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut AcceptItemSettings) {
+    pub fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut AcceptItemSettings, game_hwnd: Option<HWND>) {
         // Sync UI with Settings on first load
         if !self.settings_synced {
             self.interval_ms_str = settings.interval_ms.to_string();
@@ -70,13 +61,19 @@ impl ImageClickerTool {
         }
 
         // Handle calibration interaction
-        if let Some(hwnd) = self.game_hwnd {
+        if let Some(hwnd) = game_hwnd {
             if let Some(result) = self.calibration.handle_clicks(hwnd) {
                 if let CalibrationResult::Area(l, t, w, h) = result {
                     settings.search_region = Some((l, t, w, h));
-                    *self.status.lock().unwrap() = "Region calibrated".to_string();
+                    self.worker.set_status("Region calibrated");
                 }
             }
+        } else {
+             // Disconnected logic
+             if self.worker.is_running() {
+                 self.worker.stop();
+                 self.worker.set_status("Disconnected");
+             }
         }
         
         // Repaint if calibrating to capture clicks immediately
@@ -84,8 +81,8 @@ impl ImageClickerTool {
              ctx.request_repaint();
         }
 
-        let is_running = *self.running.lock().unwrap();
-        let status = self.status.lock().unwrap().clone();
+        let is_running = self.worker.is_running();
+        let status = self.worker.get_status();
         let is_calibrating = self.calibration.is_active();
         let is_waiting = self.calibration.is_waiting_for_second_click();
 
@@ -99,7 +96,7 @@ impl ImageClickerTool {
             is_waiting,
             is_running,
             &status,
-            self.game_hwnd.is_some(),
+            game_hwnd.is_some(),
         );
 
         // Update settings from string buffer immediately
@@ -110,21 +107,20 @@ impl ImageClickerTool {
         match action {
             ImageUiAction::StartRegionCalibration => {
                 self.calibration.start_area();
-                *self.status.lock().unwrap() = "Click TOP-LEFT corner of search region".to_string();
+                self.worker.set_status("Click TOP-LEFT corner of search region");
             },
             ImageUiAction::CancelCalibration => {
                 self.calibration.cancel();
-                *self.status.lock().unwrap() = "Calibration cancelled".to_string();
+                self.worker.set_status("Calibration cancelled");
             },
             ImageUiAction::ClearRegion => {
                 settings.search_region = None;
             },
             ImageUiAction::Start => {
-                if self.game_hwnd.is_none() {
-                    *self.status.lock().unwrap() = "Connect to game first".to_string();
+                if game_hwnd.is_none() {
+                    self.worker.set_status("Connect to game first");
                 } else {
-                    // settings.interval_ms is already updated every frame from the UI string (line 106-108)
-                    self.start_automation(settings.clone());
+                    self.start_automation(settings.clone(), game_hwnd.unwrap());
                 }
             },
             ImageUiAction::Stop => {
@@ -134,24 +130,20 @@ impl ImageClickerTool {
         }
     }
 
-    pub fn start(&mut self, settings: &AcceptItemSettings) {
-        if self.game_hwnd.is_none() {
-            *self.status.lock().unwrap() = "Connect to game first".to_string();
+    pub fn start(&mut self, settings: &AcceptItemSettings, game_hwnd: Option<HWND>) {
+        if game_hwnd.is_none() {
+            self.worker.set_status("Connect to game first");
         } else {
-            // settings.interval_ms is already updated every frame from the UI string (line 106-108)
-            self.start_automation(settings.clone());
+            self.start_automation(settings.clone(), game_hwnd.unwrap());
         }
     }
 
-    fn start_automation(&mut self, settings: AcceptItemSettings) {
-        let running = Arc::clone(&self.running);
-        let status = Arc::clone(&self.status);
-        let game_hwnd = self.game_hwnd.unwrap();
+    fn start_automation(&mut self, settings: AcceptItemSettings, game_hwnd: HWND) {
+        self.worker.set_status("Starting...");
 
-        *running.lock().unwrap() = true;
-        *status.lock().unwrap() = "Starting...".to_string();
+        let image_path = settings.image_path.clone(); // Clone for thread
 
-        thread::spawn(move || {
+        self.worker.start(move |running: Arc<Mutex<bool>>, status: Arc<Mutex<String>>| {
             let mut ctx = match AutomationContext::new(game_hwnd) {
                 Ok(c) => c,
                 Err(e) => {
@@ -160,14 +152,8 @@ impl ImageClickerTool {
                     return;
                 }
             };
-
-            // Store template
-            // Note: AutomationContext uses memory cache, but standard find_template 
-            // loads from disk every time. For optimization let's assume we want to cache it.
-            // But detection module's `find_stored_template` expects a key.
-            // Let's us use it directly.
             
-            if let Err(e) = ctx.store_template(&settings.image_path, settings.search_region, "target_image") {
+            if let Err(e) = ctx.store_template(&image_path, settings.search_region, "target_image") {
                  *status.lock().unwrap() = format!("Image Error: {}", e);
                  *running.lock().unwrap() = false;
                  return;
@@ -176,7 +162,7 @@ impl ImageClickerTool {
             *status.lock().unwrap() = "Searching...".to_string();
 
             while *running.lock().unwrap() {
-                // Using new settings.tolerance which is now treated as Minimum Confidence
+                // Using settings.tolerance which is now treated as Minimum Confidence
                 match find_stored_template(&mut ctx.gui, "target_image", settings.tolerance) {
                     Some(matches) if !matches.is_empty() => {
                         let (screen_x, screen_y) = matches[0];
