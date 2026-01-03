@@ -55,6 +55,20 @@ impl Tool for CollectionFillerTool {
         "Collection Filler"
     }
 
+    fn start(&mut self, app_settings: &crate::settings::AppSettings, game_hwnd: Option<HWND>) {
+         let settings = &app_settings.collection_filler;
+         
+         if self.is_fully_calibrated(settings) {
+             if let Some(hwnd) = game_hwnd {
+                 self.start_automation(settings.clone(), hwnd);
+             } else {
+                  self.worker.set_status("Connect to game first");
+             }
+         } else {
+             self.worker.set_status("Please calibrate all required items first");
+         }
+    }
+
     fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut crate::settings::AppSettings, game_hwnd: Option<HWND>) {
         let settings = &mut settings.collection_filler;
         

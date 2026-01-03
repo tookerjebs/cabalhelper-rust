@@ -33,8 +33,8 @@ pub struct CabalHelperApp {
     last_window_check: std::time::Instant,
     last_esc_check: std::time::Instant,
     
-    // Position caching for smart repaint
-    last_overlay_pos: Option<(f32, f32)>,
+    // Cached game window rect for smart overlay snapping
+    cached_game_rect: Option<(i32, i32, i32, i32)>,
 }
 
 impl Default for CabalHelperApp {
@@ -61,7 +61,7 @@ impl Default for CabalHelperApp {
             is_overlay_mode: false,
             last_window_check: std::time::Instant::now(),
             last_esc_check: std::time::Instant::now(),
-            last_overlay_pos: None,
+            cached_game_rect: None,
         }
     }
 }
@@ -102,24 +102,22 @@ impl eframe::App for CabalHelperApp {
         if self.is_overlay_mode {
             panel = panel.frame(egui::Frame::none().fill(egui::Color32::TRANSPARENT));
             
-            // Auto-Snap Logic
+            // Smart Auto-Snap Logic: only move when game window changes
             if let Some(game_hwnd) = self.game_hwnd {
-                if let Some((x, y, w, _h)) = crate::core::window::get_client_rect_in_screen_coords(game_hwnd) {
-                     let overlay_w = 200;
-                     let target_x = x + (w / 2) - (overlay_w / 2);
-                     let target_y = y as f32;
-                     
-                     let should_move = match self.last_overlay_pos {
-                         Some((last_x, last_y)) => {
-                             (last_x - target_x as f32).abs() > 1.0 || (last_y - target_y).abs() > 1.0
-                         },
-                         None => true
-                     };
-
-                     if should_move {
+                if let Some((x, y, w, h)) = crate::core::window::get_client_rect_in_screen_coords(game_hwnd) {
+                    let current_rect = (x, y, w, h);
+                    
+                    // Only update position if game window rect changed
+                    let rect_changed = self.cached_game_rect != Some(current_rect);
+                    
+                    if rect_changed {
+                        let overlay_w = 200;
+                        let target_x = x + (w / 2) - (overlay_w / 2);
+                        let target_y = y as f32;
+                        
                         ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition([target_x as f32, target_y].into()));
-                        self.last_overlay_pos = Some((target_x as f32, target_y));
-                     }
+                        self.cached_game_rect = Some(current_rect);
+                    }
                 }
             }
         }
@@ -132,64 +130,65 @@ impl eframe::App for CabalHelperApp {
                     ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag);
                 }
                 
-                let painter = ui.painter();
-                painter.rect_filled(
-                    response.rect,
-                    egui::Rounding::same(8.0),
-                    egui::Color32::TRANSPARENT
-                );
-                
                 ui.allocate_ui_at_rect(response.rect, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.style_mut().spacing.item_spacing = egui::vec2(6.0, 0.0);
-                        
-                        // Collect button states and actions first
-                        let mut tool_to_toggle: Option<usize> = None;
-                        
-                        for (idx, tool) in self.tools.iter().enumerate() {
-                           let is_running = tool.is_running();
-                           let btn_text = format!("{}", idx + 1);
-                           let btn = egui::Button::new(
-                                egui::RichText::new(btn_text)
-                                    .size(17.0) 
-                                    .strong()
-                                    .color(if is_running { egui::Color32::GREEN } else { egui::Color32::WHITE })
-                            ).min_size(egui::vec2(40.0, 40.0));
-                            
-                            if ui.add(btn).clicked() {
-                                tool_to_toggle = Some(idx);
-                            }
-                        }
-                        
-                        // Apply the toggle action after iteration
-                        if let Some(idx) = tool_to_toggle {
-                            let is_running = self.tools[idx].is_running();
-                            if is_running {
-                                self.tools[idx].stop();
-                            } else {
-                                // Stop all tools first
-                                for tool in &mut self.tools {
-                                    tool.stop();
+                    // Collect button states and actions first
+                    let mut tool_to_toggle: Option<usize> = None;
+                    
+                    // Make background 100% transparent - only buttons visible
+                    egui::Frame::none()
+                        .fill(egui::Color32::TRANSPARENT)
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.style_mut().spacing.item_spacing = egui::vec2(6.0, 0.0);
+                                
+                                for (idx, tool) in self.tools.iter().enumerate() {
+                                   let is_running = tool.is_running();
+                                   let btn_text = format!("{}", idx + 1);
+                                   let btn = egui::Button::new(
+                                        egui::RichText::new(btn_text)
+                                            .size(17.0) 
+                                            .strong()
+                                            .color(if is_running { egui::Color32::GREEN } else { egui::Color32::WHITE })
+                                    ).min_size(egui::vec2(40.0, 40.0));
+                                    
+                                    if ui.add(btn).clicked() {
+                                        tool_to_toggle = Some(idx);
+                                    }
                                 }
-                                // Switch to this tool's tab so user can configure and start it from main UI
-                                self.selected_tab = self.tools[idx].get_name().to_string();
+
+                                ui.separator();
+
+                                 let btn = egui::Button::new(
+                                        egui::RichText::new("🔙").size(14.0)
+                                    ).min_size(egui::vec2(28.0, 43.0));
+                                    
+                                if ui.add(btn).clicked() {
+                                    self.is_overlay_mode = false;
+                                    ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(true));
+                                    ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::Normal));
+                                    ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([600.0, 450.0].into()));
+                                }
+                            });
+                        });
+                    
+                    // Apply the toggle action after UI rendering
+                    if let Some(idx) = tool_to_toggle {
+                        let is_running = self.tools[idx].is_running();
+                        if is_running {
+                            self.tools[idx].stop();
+                        } else {
+                            // Stop all tools first
+                            for tool in &mut self.tools {
+                                tool.stop();
                             }
-                            ctx.request_repaint();
-                        }
-
-                        ui.separator();
-
-                         let btn = egui::Button::new(
-                                egui::RichText::new("🔙").size(14.0)
-                            ).min_size(egui::vec2(28.0, 43.0));
+                            // Start the requested tool
+                            self.tools[idx].start(&self.settings, self.game_hwnd);
                             
-                        if ui.add(btn).clicked() {
-                            self.is_overlay_mode = false;
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(true));
-                            ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::Normal));
-                            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([600.0, 450.0].into()));
+                            // Switch to this tool's tab so user can configure and start it from main UI
+                            self.selected_tab = self.tools[idx].get_name().to_string();
                         }
-                    });
+                        ctx.request_repaint();
+                    }
                 });
             } else {
                 // Normal View

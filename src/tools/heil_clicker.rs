@@ -52,6 +52,20 @@ impl Tool for HeilClickerTool {
         "Heil Clicker"
     }
 
+    fn start(&mut self, app_settings: &crate::settings::AppSettings, game_hwnd: Option<HWND>) {
+        let settings = &app_settings.heil_clicker;
+        
+        if let Some(hwnd) = game_hwnd {
+            if let Some(pos) = settings.click_position {
+                self.start_clicking(pos, settings.interval_ms, hwnd);
+            } else {
+                self.worker.set_status("Calibrate position first");
+            }
+        } else {
+             self.worker.set_status("Connect to game first");
+        }
+    }
+
     fn update(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut crate::settings::AppSettings, game_hwnd: Option<HWND>) {
         let settings = &mut settings.heil_clicker;
         

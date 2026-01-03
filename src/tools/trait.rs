@@ -17,6 +17,9 @@ pub trait Tool {
     #[allow(dead_code)] // Used by implementations, not called directly on trait
     fn get_status(&self) -> String;
 
+    /// Start the tool with the given settings
+    fn start(&mut self, settings: &AppSettings, game_hwnd: Option<HWND>);
+
     /// Update loop for UI and logic
     fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut AppSettings, game_hwnd: Option<HWND>);
 

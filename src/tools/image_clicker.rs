@@ -55,6 +55,16 @@ impl Tool for ImageClickerTool {
         "Accept Item"
     }
 
+    fn start(&mut self, app_settings: &crate::settings::AppSettings, game_hwnd: Option<HWND>) {
+         let settings = &app_settings.accept_item;
+         
+         if let Some(hwnd) = game_hwnd {
+             self.start_automation(settings.clone(), hwnd);
+         } else {
+             self.worker.set_status("Connect to game first");
+         }
+    }
+
     fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut crate::settings::AppSettings, game_hwnd: Option<HWND>) {
         let settings = &mut settings.accept_item;
 
