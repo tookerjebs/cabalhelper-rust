@@ -1,6 +1,5 @@
 use eframe::egui;
 use windows::Win32::Foundation::HWND;
-use crate::settings::HeilClickerSettings;
 use crate::tools::r#trait::Tool;
 use crate::calibration::{CalibrationManager, CalibrationResult};
 use crate::automation::interaction::delay_ms;
@@ -48,10 +47,14 @@ impl Tool for HeilClickerTool {
     fn get_status(&self) -> String {
         self.worker.get_status()
     }
-}
 
-impl HeilClickerTool {
-    pub fn update(&mut self, ui: &mut egui::Ui, settings: &mut HeilClickerSettings, game_hwnd: Option<HWND>) {
+    fn get_name(&self) -> &str {
+        "Heil Clicker"
+    }
+
+    fn update(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut crate::settings::AppSettings, game_hwnd: Option<HWND>) {
+        let settings = &mut settings.heil_clicker;
+        
         // Sync setting string if needed (on first load)
         if !self.settings_synced {
             self.delay_ms_str = settings.interval_ms.to_string();
@@ -60,7 +63,7 @@ impl HeilClickerTool {
 
         // Handle calibration interaction
         if let Some(hwnd) = game_hwnd {
-            if let Some(result) = self.calibration.handle_clicks(hwnd) {
+            if let Some(result) = self.calibration.update(hwnd) {
                 if let CalibrationResult::Point(x, y) = result {
                     settings.click_position = Some((x, y));
                     self.worker.set_status(&format!("Calibrated: ({}, {})", x, y));
@@ -120,19 +123,10 @@ impl HeilClickerTool {
             HeilUiAction::None => {}
         }
     }
+}
 
-    pub fn start(&mut self, settings: &HeilClickerSettings, game_hwnd: Option<HWND>) {
-        let delay = self.delay_ms_str.parse::<u64>().unwrap_or(200);
-        
-        if game_hwnd.is_none() {
-            self.worker.set_status("Connect to game first");
-        } else if settings.click_position.is_none() {
-            self.worker.set_status("Calibrate position first");
-        } else {
-            self.start_clicking(settings.click_position.unwrap(), delay, game_hwnd.unwrap());
-        }
-    }
-
+impl HeilClickerTool {
+    // start_clicking moved to private or kept here as helper
     fn start_clicking(&mut self, pos: (i32, i32), delay: u64, game_hwnd: HWND) {
         self.worker.set_status(&format!("Clicking started at ({}, {})", pos.0, pos.1));
         

@@ -66,9 +66,15 @@ impl CalibrationManager {
         self.is_area && self.area_start.is_some()
     }
     
+    /// Main update loop for calibration
+    /// Handles mouse clicks and returns result if calibration finished this frame
+    pub fn update(&mut self, game_hwnd: HWND) -> Option<CalibrationResult> {
+         self.handle_clicks(game_hwnd)
+    }
+
     /// Handle mouse clicks and return calibration result if complete
     /// Returns Some(result) when calibration is complete, None otherwise
-    pub fn handle_clicks(&mut self, game_hwnd: HWND) -> Option<CalibrationResult> {
+    fn handle_clicks(&mut self, game_hwnd: HWND) -> Option<CalibrationResult> {
         if !self.active {
             return None;
         }

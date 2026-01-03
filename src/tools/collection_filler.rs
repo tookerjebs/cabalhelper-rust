@@ -50,13 +50,17 @@ impl Tool for CollectionFillerTool {
     fn get_status(&self) -> String {
         self.worker.get_status()
     }
-}
 
-impl CollectionFillerTool {
-    pub fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut CollectionFillerSettings, game_hwnd: Option<HWND>) {
+    fn get_name(&self) -> &str {
+        "Collection Filler"
+    }
+
+    fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut crate::settings::AppSettings, game_hwnd: Option<HWND>) {
+        let settings = &mut settings.collection_filler;
+        
         // Handle calibration interaction
         if let Some(hwnd) = game_hwnd {
-            if let Some(result) = self.calibration.handle_clicks(hwnd) {
+            if let Some(result) = self.calibration.update(hwnd) {
                 if let Some(item) = self.calibrating_item.take() {
                     apply_calibration_result(result, item, settings);
                     self.worker.set_status("Calibration recorded");
@@ -125,7 +129,9 @@ impl CollectionFillerTool {
             UiAction::None => {}
         }
     }
+}
 
+impl CollectionFillerTool {
     fn is_fully_calibrated(&self, settings: &CollectionFillerSettings) -> bool {
         settings.collection_tabs_area.is_some() &&
         settings.dungeon_list_area.is_some() &&
@@ -135,17 +141,7 @@ impl CollectionFillerTool {
         settings.yes_pos.is_some()
     }
 
-    pub fn start(&mut self, settings: &CollectionFillerSettings, game_hwnd: Option<HWND>) {
-        if self.is_fully_calibrated(settings) {
-            if let Some(hwnd) = game_hwnd {
-                self.start_automation(settings.clone(), hwnd);
-            } else {
-                 self.worker.set_status("Connect to game first");
-            }
-        } else {
-            self.worker.set_status("Please calibrate all required items first");
-        }
-    }
+    // start method removed as it's now internal to UiAction handling
 
     fn start_automation(&mut self, settings: CollectionFillerSettings, game_hwnd: HWND) {
         self.worker.set_status("Starting automation...");

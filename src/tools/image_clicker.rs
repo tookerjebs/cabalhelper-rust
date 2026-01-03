@@ -50,10 +50,14 @@ impl Tool for ImageClickerTool {
     fn get_status(&self) -> String {
         self.worker.get_status()
     }
-}
 
-impl ImageClickerTool {
-    pub fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut AcceptItemSettings, game_hwnd: Option<HWND>) {
+    fn get_name(&self) -> &str {
+        "Accept Item"
+    }
+
+    fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut crate::settings::AppSettings, game_hwnd: Option<HWND>) {
+        let settings = &mut settings.accept_item;
+
         // Sync UI with Settings on first load
         if !self.settings_synced {
             self.interval_ms_str = settings.interval_ms.to_string();
@@ -62,7 +66,7 @@ impl ImageClickerTool {
 
         // Handle calibration interaction
         if let Some(hwnd) = game_hwnd {
-            if let Some(result) = self.calibration.handle_clicks(hwnd) {
+            if let Some(result) = self.calibration.update(hwnd) {
                 if let CalibrationResult::Area(l, t, w, h) = result {
                     settings.search_region = Some((l, t, w, h));
                     self.worker.set_status("Region calibrated");
@@ -129,15 +133,10 @@ impl ImageClickerTool {
             ImageUiAction::None => {}
         }
     }
+}
 
-    pub fn start(&mut self, settings: &AcceptItemSettings, game_hwnd: Option<HWND>) {
-        if game_hwnd.is_none() {
-            self.worker.set_status("Connect to game first");
-        } else {
-            self.start_automation(settings.clone(), game_hwnd.unwrap());
-        }
-    }
-
+impl ImageClickerTool {
+    // start_automation kept as private helper
     fn start_automation(&mut self, settings: AcceptItemSettings, game_hwnd: HWND) {
         self.worker.set_status("Starting...");
 

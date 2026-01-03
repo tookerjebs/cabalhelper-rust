@@ -15,7 +15,7 @@ use app::CabalHelperApp;
 fn main() -> Result<(), eframe::Error> {
     // Enable High DPI Awareness
     unsafe {
-        SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     }
 
     let options = eframe::NativeOptions {

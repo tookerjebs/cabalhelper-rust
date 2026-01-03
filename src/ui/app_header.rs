@@ -79,16 +79,3 @@ pub fn render_connection_panel(
     
     action
 }
-
-/// Render tab navigation
-pub fn render_tabs<T: PartialEq + Copy>(
-    ui: &mut egui::Ui,
-    selected_tab: &mut T,
-    tabs: &[(T, &str)],
-) {
-    ui.horizontal(|ui| {
-        for (tab_value, tab_label) in tabs {
-            ui.selectable_value(selected_tab, *tab_value, *tab_label);
-        }
-    });
-}

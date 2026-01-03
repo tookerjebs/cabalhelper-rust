@@ -160,7 +160,7 @@ fn render_button_calibration(
     item: CalibrationItem,
     current: Option<(i32, i32)>,
     calibrating_item: &Option<CalibrationItem>,
-    calibration: &CalibrationManager,
+    _calibration: &CalibrationManager,
 ) -> Option<UiAction> {
     let mut action = None;
     ui.horizontal(|ui| {

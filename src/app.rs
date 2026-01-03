@@ -8,39 +8,24 @@ use crate::settings::AppSettings;
 use windows::Win32::Foundation::HWND;
 
 // Macro to toggle a tool with mutual exclusion
-macro_rules! toggle_tool_exclusive {
-    ($self:expr, $tool:ident, $settings:expr, $ctx:expr) => {
-        if $self.$tool.is_running() {
-            $self.$tool.stop();
-        } else {
-            // Stop all tools first
-            $self.heil_clicker.stop();
-            $self.collection_filler.stop();
-            $self.image_clicker.stop();
-            
-            // Start the requested tool
-            $self.$tool.start($settings, $self.game_hwnd);
-        }
-        $ctx.request_repaint();
-    };
-}
+
 
 pub struct CabalHelperApp {
-    // Current valid tools
-    heil_clicker: HeilClickerTool,
-    image_clicker: ImageClickerTool,
-    collection_filler: CollectionFillerTool,
+
     
     // Centralized settings
     settings: AppSettings,
     
-    // Global Game State
-    game_hwnd: Option<HWND>,
-    game_title: String,
+    // Tools collection
+    tools: Vec<Box<dyn Tool>>,
     
-    // Tab state
-    selected_tab: Tab,
-
+    // UI State
+    selected_tab: String,
+    
+    // Game context
+    game_hwnd: Option<HWND>,
+    status_message: String,
+    
     // Overlay state
     is_overlay_mode: bool,
     
@@ -54,31 +39,31 @@ pub struct CabalHelperApp {
 
 impl Default for CabalHelperApp {
     fn default() -> Self {
-        // Load settings on startup
+        // Load settings
         let settings = AppSettings::load();
         
+        // Initialize independent tools
+        let tools: Vec<Box<dyn Tool>> = vec![
+            Box::new(HeilClickerTool::default()),
+            Box::new(ImageClickerTool::default()),
+            Box::new(CollectionFillerTool::default())
+        ];
+        
+        // Set initial tab to first tool
+        let selected_tab = tools[0].get_name().to_string();
+
         Self {
-            heil_clicker: HeilClickerTool::default(),
-            image_clicker: ImageClickerTool::default(),
-            collection_filler: CollectionFillerTool::default(),
             settings,
+            tools,
+            selected_tab,
             game_hwnd: None,
-            game_title: "Not Connected".to_string(),
-            selected_tab: Tab::default(),
+            status_message: "Ready".to_string(),
             is_overlay_mode: false,
             last_window_check: std::time::Instant::now(),
             last_esc_check: std::time::Instant::now(),
             last_overlay_pos: None,
         }
     }
-}
-
-#[derive(PartialEq, Eq, Default, Clone, Copy)]
-enum Tab {
-    #[default]
-    HeilClicker,
-    CollectionFiller,
-    AcceptItem,
 }
 
 impl eframe::App for CabalHelperApp {
@@ -95,9 +80,9 @@ impl eframe::App for CabalHelperApp {
         use crate::core::input::is_escape_key_down;
         if self.last_esc_check.elapsed() > std::time::Duration::from_millis(100) {
             if is_escape_key_down() {
-                self.heil_clicker.stop();
-                self.collection_filler.stop();
-                self.image_clicker.stop();
+                for tool in &mut self.tools {
+                    tool.stop();
+                }
             }
             self.last_esc_check = std::time::Instant::now();
         }
@@ -107,8 +92,7 @@ impl eframe::App for CabalHelperApp {
             if let Some(hwnd) = self.game_hwnd {
                 if !is_window_valid(hwnd) {
                     self.game_hwnd = None;
-                    self.game_title = "Connection Lost".to_string();
-                    // Tools will auto-stop on next update() when they see game_hwnd is None
+                    self.status_message = "Connection Lost".to_string();
                 }
             }
             self.last_window_check = std::time::Instant::now();
@@ -159,27 +143,38 @@ impl eframe::App for CabalHelperApp {
                     ui.horizontal(|ui| {
                         ui.style_mut().spacing.item_spacing = egui::vec2(6.0, 0.0);
                         
-                        let tool_btn = |ui: &mut egui::Ui, text: &str, is_running: bool| -> bool {
-                            let btn = egui::Button::new(
-                                egui::RichText::new(text)
+                        // Collect button states and actions first
+                        let mut tool_to_toggle: Option<usize> = None;
+                        
+                        for (idx, tool) in self.tools.iter().enumerate() {
+                           let is_running = tool.is_running();
+                           let btn_text = format!("{}", idx + 1);
+                           let btn = egui::Button::new(
+                                egui::RichText::new(btn_text)
                                     .size(17.0) 
                                     .strong()
                                     .color(if is_running { egui::Color32::GREEN } else { egui::Color32::WHITE })
                             ).min_size(egui::vec2(40.0, 40.0));
                             
-                            ui.add(btn).clicked()
-                        };
-
-                        if tool_btn(ui, "1", self.heil_clicker.is_running()) {
-                            toggle_tool_exclusive!(self, heil_clicker, &self.settings.heil_clicker, ctx);
+                            if ui.add(btn).clicked() {
+                                tool_to_toggle = Some(idx);
+                            }
                         }
-
-                        if tool_btn(ui, "2", self.collection_filler.is_running()) {
-                            toggle_tool_exclusive!(self, collection_filler, &self.settings.collection_filler, ctx);
-                        }
-
-                        if tool_btn(ui, "3", self.image_clicker.is_running()) {
-                            toggle_tool_exclusive!(self, image_clicker, &self.settings.accept_item, ctx);
+                        
+                        // Apply the toggle action after iteration
+                        if let Some(idx) = tool_to_toggle {
+                            let is_running = self.tools[idx].is_running();
+                            if is_running {
+                                self.tools[idx].stop();
+                            } else {
+                                // Stop all tools first
+                                for tool in &mut self.tools {
+                                    tool.stop();
+                                }
+                                // Switch to this tool's tab so user can configure and start it from main UI
+                                self.selected_tab = self.tools[idx].get_name().to_string();
+                            }
+                            ctx.request_repaint();
                         }
 
                         ui.separator();
@@ -205,7 +200,7 @@ impl eframe::App for CabalHelperApp {
                 let connection_action = crate::ui::app_header::render_connection_panel(
                     ui,
                     &mut self.game_hwnd,
-                    &mut self.game_title
+                    &mut self.status_message // Changed to use status_message instead of game_title
                 );
                 
                 let action = if matches!(connection_action, crate::ui::app_header::HeaderAction::None) {
@@ -235,25 +230,22 @@ impl eframe::App for CabalHelperApp {
                 
                 ui.separator();
             
-                let tabs = [
-                    (Tab::HeilClicker, "Heil Clicker"),
-                    (Tab::CollectionFiller, "Collection Filler"),
-                    (Tab::AcceptItem, "Accept Item"),
-                ];
-                crate::ui::app_header::render_tabs(ui, &mut self.selected_tab, &tabs);
+                // Dynamic Tab Rendering
+                ui.horizontal(|ui| {
+                    for tool in &self.tools {
+                        let name = tool.get_name();
+                        if ui.selectable_label(self.selected_tab == name, name).clicked() {
+                            self.selected_tab = name.to_string();
+                        }
+                    }
+                });
+                
                 ui.separator();
 
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    match self.selected_tab {
-                        Tab::HeilClicker => {
-                            self.heil_clicker.update(ui, &mut self.settings.heil_clicker, self.game_hwnd);
-                        }
-                        Tab::CollectionFiller => {
-                            self.collection_filler.update(ctx, ui, &mut self.settings.collection_filler, self.game_hwnd);
-                        }
-                        Tab::AcceptItem => {
-                            self.image_clicker.update(ctx, ui, &mut self.settings.accept_item, self.game_hwnd);
-                        }
+                    // Find the selected tool and update it
+                    if let Some(tool) = self.tools.iter_mut().find(|t| t.get_name() == self.selected_tab) {
+                         tool.update(ctx, ui, &mut self.settings, self.game_hwnd);
                     }
                 });
             }

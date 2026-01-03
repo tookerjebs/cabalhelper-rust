@@ -28,14 +28,6 @@ impl AutomationContext {
         })
     }
     
-    /// Convert window-relative coordinates to screen coordinates
-    pub fn to_screen_coords(&self, rel_x: i32, rel_y: i32) -> (u32, u32) {
-        (
-            (self.window_rect.0 + rel_x) as u32,
-            (self.window_rect.1 + rel_y) as u32
-        )
-    }
-    
     /// Convert window-relative area to screen region
     pub fn to_screen_region(&self, area: (i32, i32, i32, i32)) -> (u32, u32, u32, u32) {
         (
