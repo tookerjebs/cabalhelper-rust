@@ -320,12 +320,7 @@ fn process_page_dungeons(
         *status.lock().unwrap() = "Processing dungeon...".to_string();
         click_at_screen(&mut ctx.gui, dungeon_dot.0, dungeon_dot.1);
         delay_ms(settings.delay_ms);
-
-        // Reset scroll to top
-        if let Some(items_area) = settings.collection_items_area {
-            scroll_in_area(&mut ctx.gui, ctx.game_hwnd, items_area, -20);
-        }
-        delay_ms(settings.delay_ms);
+        // Note: No scroll-up needed - game UI always starts at top when entering dungeon
 
         let max_scroll_passes = 50;
         let mut dungeon_finished = false;
@@ -352,9 +347,9 @@ fn process_page_dungeons(
                 break; // Dungeon done!
             }
 
-            // 4. Scroll down to find more items
+            // 4. Scroll down to find more items (1 tick = 1 row in game)
             if let Some(items_area) = settings.collection_items_area {
-                scroll_in_area(&mut ctx.gui, ctx.game_hwnd, items_area, 5);
+                scroll_in_area(&mut ctx.gui, ctx.game_hwnd, items_area, 1);
             }
             delay_ms(settings.delay_ms);
         }

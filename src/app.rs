@@ -33,9 +33,6 @@ pub struct CabalHelperApp {
     // Optimization state
     last_window_check: std::time::Instant,
     last_esc_check: std::time::Instant,
-    
-    // Cached game window rect for smart overlay snapping
-    cached_game_rect: Option<(i32, i32, i32, i32)>,
 }
 
 impl Default for CabalHelperApp {
@@ -63,7 +60,6 @@ impl Default for CabalHelperApp {
             is_overlay_mode: false,
             last_window_check: std::time::Instant::now(),
             last_esc_check: std::time::Instant::now(),
-            cached_game_rect: None,
         }
     }
 }
@@ -103,25 +99,6 @@ impl eframe::App for CabalHelperApp {
         let mut panel = egui::CentralPanel::default();
         if self.is_overlay_mode {
             panel = panel.frame(egui::Frame::none());
-            
-            // Smart Auto-Snap Logic: only move when game window changes
-            if let Some(game_hwnd) = self.game_hwnd {
-                if let Some((x, y, w, h)) = crate::core::window::get_client_rect_in_screen_coords(game_hwnd) {
-                    let current_rect = (x, y, w, h);
-                    
-                    // Only update position if game window rect changed
-                    let rect_changed = self.cached_game_rect != Some(current_rect);
-                    
-                    if rect_changed {
-                        let overlay_w = 168; // Horizontal: 4×36px + 1×24px buttons
-                        let target_x = x + (w / 2) - (overlay_w / 2);
-                        let target_y = y as f32;
-                        
-                        ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition([target_x as f32, target_y].into()));
-                        self.cached_game_rect = Some(current_rect);
-                    }
-                }
-            }
         }
 
         panel.show(ctx, |ui| {
@@ -228,6 +205,16 @@ impl eframe::App for CabalHelperApp {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(false));
                         ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::AlwaysOnTop));
                         ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([168.0, 36.0].into())); // Horizontal: 4×36px + 1×24px buttons
+                        
+                        // Initial positioning: top-center of game window (one-time only)
+                        if let Some(game_hwnd) = self.game_hwnd {
+                            if let Some((x, y, w, _h)) = crate::core::window::get_client_rect_in_screen_coords(game_hwnd) {
+                                let overlay_w = 168;
+                                let target_x = x + (w / 2) - (overlay_w / 2);
+                                let target_y = y as f32;
+                                ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition([target_x as f32, target_y].into()));
+                            }
+                        }
                     },
                     crate::ui::app_header::HeaderAction::None => {}
                 }
