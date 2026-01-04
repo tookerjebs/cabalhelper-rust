@@ -20,7 +20,9 @@ Thumbs.db
 
 # Settings (may contain sensitive data)
 settings.json
-
+.zencoder
+.zenflow
+docs
 # Logs
 *.log
 
@@ -28,3 +30,6 @@ settings.json
 LEGACY_REFERNCE_PYTHON_VERSION/
 
 FOR_RESEARCH_SOURCE_RUSTAUTOGUI
+RUSTAUTOGUI_DOCUMENTATION
+#image.png
+#red-dot.png

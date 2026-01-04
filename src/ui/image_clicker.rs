@@ -38,6 +38,16 @@ pub fn render_ui(
     ui.horizontal(|ui| {
         ui.label("Image Path:");
         ui.text_edit_singleline(image_path);
+        if ui.button("📁 Browse...").clicked() {
+            if let Some(path) = rfd::FileDialog::new()
+                .add_filter("Image Files", &["png", "jpg", "jpeg", "bmp"])
+                .set_title("Select Target Image")
+                .set_directory(std::env::current_dir().unwrap_or_default())
+                .pick_file()
+            {
+                *image_path = path.display().to_string();
+            }
+        }
     });
     
     ui.horizontal(|ui| {

@@ -42,6 +42,10 @@ pub struct CollectionFillerSettings {
     pub min_red: u8,
     #[serde(default = "default_red_dominance")]
     pub red_dominance: u8,
+    
+    // Red dot image path
+    #[serde(default = "default_red_dot_path")]
+    pub red_dot_path: String,
 }
 
 impl Default for CollectionFillerSettings {
@@ -61,6 +65,7 @@ impl Default for CollectionFillerSettings {
             red_dot_tolerance: 0.85,
             min_red: 150,
             red_dominance: 30,
+            red_dot_path: "red-dot.png".to_string(),
         }
     }
 }
@@ -75,6 +80,10 @@ fn default_min_red() -> u8 {
 
 fn default_red_dominance() -> u8 {
     30
+}
+
+fn default_red_dot_path() -> String {
+    "red-dot.png".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

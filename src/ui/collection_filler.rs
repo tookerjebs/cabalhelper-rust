@@ -85,6 +85,23 @@ pub fn render_ui(
     ui.add_space(10.0);
     
     // Settings
+    ui.heading("⚙️ Settings");
+    
+    ui.horizontal(|ui| {
+        ui.label("Red Dot Image:");
+        ui.text_edit_singleline(&mut settings.red_dot_path);
+        if ui.button("📁 Browse...").clicked() {
+            if let Some(path) = rfd::FileDialog::new()
+                .add_filter("Image Files", &["png", "jpg", "jpeg", "bmp"])
+                .set_title("Select Red Dot Image")
+                .set_directory(std::env::current_dir().unwrap_or_default())
+                .pick_file()
+            {
+                settings.red_dot_path = path.display().to_string();
+            }
+        }
+    });
+    
     ui.horizontal(|ui| {
         ui.label("Delay (ms):");
         let mut delay = settings.delay_ms.to_string();

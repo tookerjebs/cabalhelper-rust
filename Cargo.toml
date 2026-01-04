@@ -2,6 +2,10 @@
 name = "cabalhelper-rust"
 version = "0.1.0"
 edition = "2021"
+description = "High-performance Cabal Online automation tools rewritten in Rust."
+authors = ["Your Name <you@example.com>"]
+license = "MIT"
+repository = "https://github.com/your-username/cabalhelper-rust"
 
 [dependencies]
 # Windows API bindings
@@ -17,6 +21,7 @@ windows = { version = "0.52", features = [
 # UI framework
 eframe = "0.27"
 egui = "0.27"
+rfd = "0.14"
 rustautogui = "2.5.0"
 # Settings serialization
 serde = { version = "1.0", features = ["derive"] }

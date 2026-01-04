@@ -17,9 +17,6 @@ pub struct CollectionFillerTool {
     // Calibration
     calibration: CalibrationManager,
     calibrating_item: Option<CalibrationItem>,
-    
-    // UI State
-    red_dot_path: String,
 }
 
 impl Default for CollectionFillerTool {
@@ -28,7 +25,6 @@ impl Default for CollectionFillerTool {
             worker: Worker::new(),
             calibration: CalibrationManager::new(),
             calibrating_item: None,
-            red_dot_path: "red-dot.png".to_string(),
         }
     }
 }
@@ -155,7 +151,7 @@ impl CollectionFillerTool {
 
     fn start_automation(&mut self, settings: CollectionFillerSettings, game_hwnd: HWND) {
         self.worker.set_status("Starting automation...");
-        let red_dot_path = self.red_dot_path.clone();
+        let red_dot_path = settings.red_dot_path.clone();
 
         self.worker.start(move |running: Arc<Mutex<bool>>, status: Arc<Mutex<String>>| {
             let mut ctx = match AutomationContext::new(game_hwnd) {
