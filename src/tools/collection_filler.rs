@@ -47,10 +47,6 @@ impl Tool for CollectionFillerTool {
         self.worker.is_running()
     }
 
-    fn get_status(&self) -> String {
-        self.worker.get_status()
-    }
-
     fn get_name(&self) -> &str {
         "Collection Filler"
     }

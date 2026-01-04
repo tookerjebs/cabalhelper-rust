@@ -12,10 +12,6 @@ pub trait Tool {
     
     /// Check if the tool is currently running
     fn is_running(&self) -> bool;
-    
-    /// Get current status message
-    #[allow(dead_code)] // Used by implementations, not called directly on trait
-    fn get_status(&self) -> String;
 
     /// Start the tool with the given settings
     fn start(&mut self, settings: &AppSettings, game_hwnd: Option<HWND>);

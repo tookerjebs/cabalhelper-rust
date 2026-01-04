@@ -44,10 +44,6 @@ impl Tool for HeilClickerTool {
         self.worker.is_running()
     }
 
-    fn get_status(&self) -> String {
-        self.worker.get_status()
-    }
-
     fn get_name(&self) -> &str {
         "Heil Clicker"
     }
@@ -80,7 +76,7 @@ impl Tool for HeilClickerTool {
             if let Some(result) = self.calibration.update(hwnd) {
                 if let CalibrationResult::Point(x, y) = result {
                     settings.click_position = Some((x, y));
-                    self.worker.set_status(&format!("Calibrated: ({}, {})", x, y));
+                    self.worker.set_status(&format!("Position set: ({}, {})", x, y));
                 }
             }
         } else {
@@ -113,11 +109,11 @@ impl Tool for HeilClickerTool {
         match action {
             HeilUiAction::StartCalibration => {
                 self.calibration.start_point();
-                self.worker.set_status("Calibrating... Click on the game window");
+                self.worker.set_status("Setting coordinates... Click on the game window");
             },
             HeilUiAction::CancelCalibration => {
                 self.calibration.cancel();
-                self.worker.set_status("Calibration cancelled");
+                self.worker.set_status("Cancelled");
             },
             HeilUiAction::StartClicking => {
                 let delay = self.delay_ms_str.parse::<u64>().unwrap_or(200);
@@ -126,7 +122,7 @@ impl Tool for HeilClickerTool {
                 if game_hwnd.is_none() {
                     self.worker.set_status("Connect to game first");
                 } else if settings.click_position.is_none() {
-                    self.worker.set_status("Calibrate position first");
+                    self.worker.set_status("Set coordinates first");
                 } else {
                     self.start_clicking(settings.click_position.unwrap(), delay, game_hwnd.unwrap());
                 }

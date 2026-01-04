@@ -11,6 +11,9 @@ pub struct AppSettings {
     
     #[serde(default)]
     pub accept_item: AcceptItemSettings,
+    
+    #[serde(default)]
+    pub email_clicker: EmailClickerSettings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,6 +107,26 @@ impl Default for AcceptItemSettings {
             interval_ms: 100,  // Reduced from 1000ms for faster detection
             tolerance: 0.85, 
             search_region: None,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmailClickerSettings {
+    pub receive_position: Option<(i32, i32)>,  // "Receive" button position
+    pub next_position: Option<(i32, i32)>,      // "Next" button position
+    pub cycles: u32,                             // How many emails to collect
+    pub interval_ms: u64,                        // Delay between clicks
+}
+
+impl Default for EmailClickerSettings {
+    fn default() -> Self {
+        Self {
+            receive_position: None,
+            next_position: None,
+            cycles: 10,
+            interval_ms: 200,
         }
     }
 }

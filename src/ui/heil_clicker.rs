@@ -41,15 +41,15 @@ pub fn render_ui(
 
     ui.separator();
 
-    // Calibrate button
+    // Set coordinates button
     if game_connected {
         if !is_calibrating {
-            if ui.button("Calibrate Position").clicked() {
+            if ui.button("Set Coordinates").clicked() {
                 action = HeilUiAction::StartCalibration;
             }
         } else {
-            ui.label("🔴 Calibrating - Click on the game window now!");
-            if ui.button("Cancel Calibration").clicked() {
+            ui.label("🔴 Setting coordinates - Click on the game window now!");
+            if ui.button("Cancel").clicked() {
                 action = HeilUiAction::CancelCalibration;
             }
         }
@@ -57,11 +57,11 @@ pub fn render_ui(
 
     ui.separator();
 
-    // Show calibrated coordinates
+    // Show set coordinates
     if let Some((x, y)) = calibrated_pos {
-        ui.label(format!("Calibrated Position: X={}, Y={}", x, y));
+        ui.label(format!("Position: X={}, Y={}", x, y));
     } else {
-        ui.label("Position: Not calibrated");
+        ui.label("Position: Not set");
     }
 
     ui.separator();

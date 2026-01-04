@@ -2,6 +2,7 @@ use eframe::egui;
 use crate::tools::heil_clicker::HeilClickerTool;
 use crate::tools::image_clicker::ImageClickerTool;
 use crate::tools::collection_filler::CollectionFillerTool;
+use crate::tools::email_clicker::EmailClickerTool;
 use crate::tools::r#trait::Tool;
 use crate::core::window::is_window_valid;
 use crate::settings::AppSettings;
@@ -46,7 +47,8 @@ impl Default for CabalHelperApp {
         let tools: Vec<Box<dyn Tool>> = vec![
             Box::new(HeilClickerTool::default()),
             Box::new(ImageClickerTool::default()),
-            Box::new(CollectionFillerTool::default())
+            Box::new(CollectionFillerTool::default()),
+            Box::new(EmailClickerTool::default())
         ];
         
         // Set initial tab to first tool
@@ -111,7 +113,7 @@ impl eframe::App for CabalHelperApp {
                     let rect_changed = self.cached_game_rect != Some(current_rect);
                     
                     if rect_changed {
-                        let overlay_w = 200;
+                        let overlay_w = 50; // Vertical dock width
                         let target_x = x + (w / 2) - (overlay_w / 2);
                         let target_y = y as f32;
                         
@@ -138,29 +140,35 @@ impl eframe::App for CabalHelperApp {
                     egui::Frame::none()
                         .fill(egui::Color32::TRANSPARENT)
                         .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                ui.style_mut().spacing.item_spacing = egui::vec2(6.0, 0.0);
+                            ui.vertical(|ui| {
+                                ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 4.0);
                                 
+                                // Tool buttons in vertical layout
                                 for (idx, tool) in self.tools.iter().enumerate() {
                                    let is_running = tool.is_running();
                                    let btn_text = format!("{}", idx + 1);
                                    let btn = egui::Button::new(
                                         egui::RichText::new(btn_text)
-                                            .size(17.0) 
+                                            .size(16.0) 
                                             .strong()
                                             .color(if is_running { egui::Color32::GREEN } else { egui::Color32::WHITE })
-                                    ).min_size(egui::vec2(40.0, 40.0));
+                                    ).min_size(egui::vec2(36.0, 36.0));
                                     
                                     if ui.add(btn).clicked() {
                                         tool_to_toggle = Some(idx);
                                     }
                                 }
 
-                                ui.separator();
+                                ui.add_space(2.0);
 
+                                 // Subtle settings button to return to main window
                                  let btn = egui::Button::new(
-                                        egui::RichText::new("🔙").size(14.0)
-                                    ).min_size(egui::vec2(28.0, 43.0));
+                                        egui::RichText::new("⚙")
+                                            .size(12.0)
+                                            .color(egui::Color32::from_rgb(150, 150, 150))
+                                    )
+                                    .min_size(egui::vec2(36.0, 24.0))
+                                    .fill(egui::Color32::from_rgba_premultiplied(40, 40, 40, 180));
                                     
                                 if ui.add(btn).clicked() {
                                     self.is_overlay_mode = false;
@@ -222,7 +230,7 @@ impl eframe::App for CabalHelperApp {
                         self.is_overlay_mode = true;
                         ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(false));
                         ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::AlwaysOnTop));
-                        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([200.0, 47.0].into()));
+                        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([50.0, 192.0].into())); // Vertical: 4 buttons (36px each) + settings (24px) + spacing
                     },
                     crate::ui::app_header::HeaderAction::None => {}
                 }
