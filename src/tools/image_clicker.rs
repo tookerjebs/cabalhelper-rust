@@ -184,7 +184,7 @@ impl ImageClickerTool {
                              *status.lock().unwrap() = "Error converting coordinates".to_string();
                         }
                         
-                        // Wait a bit extra after click
+                        // Hardcoded safety delay after click to prevent double-clicking
                         delay_ms(500);
                     },
                     _ => {
@@ -192,6 +192,7 @@ impl ImageClickerTool {
                     }
                 }
                 
+                // User-configured polling interval (how often to check screen)
                 delay_ms(settings.interval_ms);
             }
             
