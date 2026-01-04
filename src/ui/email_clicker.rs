@@ -78,7 +78,6 @@ pub fn render_ui(
         });
 
         if is_calibrating {
-            ui.colored_label(egui::Color32::YELLOW, "🖱️ Click on the game window to set coordinates");
             if ui.button("Cancel").clicked() {
                 action = EmailUiAction::CancelCalibration;
             }

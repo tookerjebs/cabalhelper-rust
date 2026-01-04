@@ -45,7 +45,7 @@ pub fn render_connection_panel(
         .rounding(4.0)
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label("🎮 Game Connection:");
+                ui.label("Game Connection:");
                 
                 if game_hwnd.is_none() {
                     if ui.button("🔌 Connect").clicked() {
@@ -61,10 +61,19 @@ pub fn render_connection_panel(
                 } else {
                     ui.label(egui::RichText::new(game_title.as_str()).color(egui::Color32::GREEN).strong());
                     
-                    // Show window info
+                    // Show window info: resolution, position, PID
                     if let Some(hwnd) = game_hwnd {
-                        if let Some((_, _, w, h)) = crate::core::window::get_client_rect_in_screen_coords(*hwnd) {
+                        if let Some((x, y, w, h)) = crate::core::window::get_client_rect_in_screen_coords(*hwnd) {
+                            ui.label(egui::RichText::new("•").color(egui::Color32::DARK_GRAY));
                             ui.label(egui::RichText::new(format!("{}x{}", w, h)).color(egui::Color32::LIGHT_GRAY).small());
+                            
+                            ui.label(egui::RichText::new("•").color(egui::Color32::DARK_GRAY));
+                            ui.label(egui::RichText::new(format!("Pos: ({}, {})", x, y)).color(egui::Color32::LIGHT_GRAY).small());
+                        }
+                        
+                        if let Some(pid) = crate::core::window::get_process_id(*hwnd) {
+                            ui.label(egui::RichText::new("•").color(egui::Color32::DARK_GRAY));
+                            ui.label(egui::RichText::new(format!("PID: {}", pid)).color(egui::Color32::LIGHT_GRAY).small());
                         }
                     }
                     

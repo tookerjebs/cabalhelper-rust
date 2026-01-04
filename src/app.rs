@@ -102,7 +102,7 @@ impl eframe::App for CabalHelperApp {
 
         let mut panel = egui::CentralPanel::default();
         if self.is_overlay_mode {
-            panel = panel.frame(egui::Frame::none().fill(egui::Color32::TRANSPARENT));
+            panel = panel.frame(egui::Frame::none());
             
             // Smart Auto-Snap Logic: only move when game window changes
             if let Some(game_hwnd) = self.game_hwnd {
@@ -113,7 +113,7 @@ impl eframe::App for CabalHelperApp {
                     let rect_changed = self.cached_game_rect != Some(current_rect);
                     
                     if rect_changed {
-                        let overlay_w = 50; // Vertical dock width
+                        let overlay_w = 168; // Horizontal: 4×36px + 1×24px buttons
                         let target_x = x + (w / 2) - (overlay_w / 2);
                         let target_y = y as f32;
                         
@@ -136,48 +136,45 @@ impl eframe::App for CabalHelperApp {
                     // Collect button states and actions first
                     let mut tool_to_toggle: Option<usize> = None;
                     
-                    // Make background 100% transparent - only buttons visible
-                    egui::Frame::none()
-                        .fill(egui::Color32::TRANSPARENT)
-                        .show(ui, |ui| {
-                            ui.vertical(|ui| {
-                                ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 4.0);
-                                
-                                // Tool buttons in vertical layout
-                                for (idx, tool) in self.tools.iter().enumerate() {
-                                   let is_running = tool.is_running();
-                                   let btn_text = format!("{}", idx + 1);
-                                   let btn = egui::Button::new(
-                                        egui::RichText::new(btn_text)
-                                            .size(16.0) 
-                                            .strong()
-                                            .color(if is_running { egui::Color32::GREEN } else { egui::Color32::WHITE })
-                                    ).min_size(egui::vec2(36.0, 36.0));
-                                    
-                                    if ui.add(btn).clicked() {
-                                        tool_to_toggle = Some(idx);
-                                    }
-                                }
+                    // Horizontal layout - tight fit with borders
+                    ui.horizontal(|ui| {
+                        ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 0.0);
+                        
+                        // Tool buttons with borders
+                        for (idx, tool) in self.tools.iter().enumerate() {
+                           let is_running = tool.is_running();
+                           let btn_text = format!("{}", idx + 1);
+                           let btn = egui::Button::new(
+                                egui::RichText::new(btn_text)
+                                    .size(16.0) 
+                                    .strong()
+                                    .color(if is_running { egui::Color32::GREEN } else { egui::Color32::WHITE })
+                            )
+                            .min_size(egui::vec2(36.0, 36.0))
+                            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 60, 60)));
+                            
+                            if ui.add(btn).clicked() {
+                                tool_to_toggle = Some(idx);
+                            }
+                        }
 
-                                ui.add_space(2.0);
-
-                                 // Subtle settings button to return to main window
-                                 let btn = egui::Button::new(
-                                        egui::RichText::new("⚙")
-                                            .size(12.0)
-                                            .color(egui::Color32::from_rgb(150, 150, 150))
-                                    )
-                                    .min_size(egui::vec2(36.0, 24.0))
-                                    .fill(egui::Color32::from_rgba_premultiplied(40, 40, 40, 180));
-                                    
-                                if ui.add(btn).clicked() {
-                                    self.is_overlay_mode = false;
-                                    ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(true));
-                                    ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::Normal));
-                                    ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([600.0, 450.0].into()));
-                                }
-                            });
-                        });
+                         // Settings button with border
+                         let btn = egui::Button::new(
+                                egui::RichText::new("⚙")
+                                    .size(12.0)
+                                    .color(egui::Color32::from_rgb(150, 150, 150))
+                            )
+                            .min_size(egui::vec2(24.0, 36.0))
+                            .fill(egui::Color32::from_rgba_premultiplied(40, 40, 40, 180))
+                            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 60, 60)));
+                            
+                        if ui.add(btn).clicked() {
+                            self.is_overlay_mode = false;
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(true));
+                            ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::Normal));
+                            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([600.0, 450.0].into()));
+                        }
+                    });
                     
                     // Apply the toggle action after UI rendering
                     if let Some(idx) = tool_to_toggle {
@@ -230,7 +227,7 @@ impl eframe::App for CabalHelperApp {
                         self.is_overlay_mode = true;
                         ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(false));
                         ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::AlwaysOnTop));
-                        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([50.0, 192.0].into())); // Vertical: 4 buttons (36px each) + settings (24px) + spacing
+                        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([168.0, 36.0].into())); // Horizontal: 4×36px + 1×24px buttons
                     },
                     crate::ui::app_header::HeaderAction::None => {}
                 }

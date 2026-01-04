@@ -32,36 +32,27 @@ pub fn render_ui(
 
     ui.separator();
 
-    // Connection status
-    if !game_connected {
-        ui.colored_label(egui::Color32::RED, "Please connect to game first (top right)");
-    } else {
-        ui.colored_label(egui::Color32::GREEN, "Game Connected");
-    }
-
-    ui.separator();
-
-    // Set coordinates button
+    // Set coordinates button and position display in one row
     if game_connected {
-        if !is_calibrating {
-            if ui.button("Set Coordinates").clicked() {
-                action = HeilUiAction::StartCalibration;
+        ui.horizontal(|ui| {
+            if !is_calibrating {
+                if ui.button("Set Coordinates").clicked() {
+                    action = HeilUiAction::StartCalibration;
+                }
+            } else {
+                ui.label("🔴 Setting coordinates - Click on the game window now!");
+                if ui.button("Cancel").clicked() {
+                    action = HeilUiAction::CancelCalibration;
+                }
             }
-        } else {
-            ui.label("🔴 Setting coordinates - Click on the game window now!");
-            if ui.button("Cancel").clicked() {
-                action = HeilUiAction::CancelCalibration;
+            
+            // Show position inline
+            if let Some((x, y)) = calibrated_pos {
+                ui.label(egui::RichText::new(format!("Position: X={}, Y={}", x, y)).color(egui::Color32::LIGHT_GRAY));
+            } else if !is_calibrating {
+                ui.label(egui::RichText::new("Position: Not set").color(egui::Color32::GRAY));
             }
-        }
-    }
-
-    ui.separator();
-
-    // Show set coordinates
-    if let Some((x, y)) = calibrated_pos {
-        ui.label(format!("Position: X={}, Y={}", x, y));
-    } else {
-        ui.label("Position: Not set");
+        });
     }
 
     ui.separator();
