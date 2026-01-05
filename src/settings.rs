@@ -14,6 +14,9 @@ pub struct AppSettings {
     
     #[serde(default)]
     pub email_clicker: EmailClickerSettings,
+    
+    #[serde(default)]
+    pub custom_macro: CustomMacroSettings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,6 +143,49 @@ impl Default for EmailClickerSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum MacroAction {
+    Click {
+        coordinate: Option<(i32, i32)>,
+        button: MouseButton,
+        use_mouse_movement: bool,
+    },
+    TypeText {
+        text: String,
+    },
+    Delay {
+        milliseconds: u64,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
+pub enum MouseButton {
+    Left,
+    Right,
+}
+
+impl Default for MouseButton {
+    fn default() -> Self {
+        MouseButton::Left
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomMacroSettings {
+    pub actions: Vec<MacroAction>,
+    pub loop_enabled: bool,
+    pub loop_count: u32,
+}
+
+impl Default for CustomMacroSettings {
+    fn default() -> Self {
+        Self {
+            actions: Vec::new(),
+            loop_enabled: false,
+            loop_count: 1,
+        }
+    }
+}
 
 impl AppSettings {
     const SETTINGS_FILE: &'static str = "cabalhelper_settings.json";

@@ -3,6 +3,7 @@ use crate::tools::heil_clicker::HeilClickerTool;
 use crate::tools::image_clicker::ImageClickerTool;
 use crate::tools::collection_filler::CollectionFillerTool;
 use crate::tools::email_clicker::EmailClickerTool;
+use crate::tools::custom_macro::CustomMacroTool;
 use crate::tools::r#trait::Tool;
 use crate::core::window::is_window_valid;
 use crate::settings::AppSettings;
@@ -45,7 +46,8 @@ impl Default for CabalHelperApp {
             Box::new(HeilClickerTool::default()),
             Box::new(ImageClickerTool::default()),
             Box::new(CollectionFillerTool::default()),
-            Box::new(EmailClickerTool::default())
+            Box::new(EmailClickerTool::default()),
+            Box::new(CustomMacroTool::default()),
         ];
         
         // Set initial tab to first tool
@@ -204,12 +206,12 @@ impl eframe::App for CabalHelperApp {
                         self.is_overlay_mode = true;
                         ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(false));
                         ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::AlwaysOnTop));
-                        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([168.0, 36.0].into())); // Horizontal: 4×36px + 1×24px buttons
+                        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([204.0, 36.0].into())); // Horizontal: 5×36px + 1×24px buttons
                         
                         // Initial positioning: top-center of game window (one-time only)
                         if let Some(game_hwnd) = self.game_hwnd {
                             if let Some((x, y, w, _h)) = crate::core::window::get_client_rect_in_screen_coords(game_hwnd) {
-                                let overlay_w = 168;
+                                let overlay_w = 204;
                                 let target_x = x + (w / 2) - (overlay_w / 2);
                                 let target_y = y as f32;
                                 ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition([target_x as f32, target_y].into()));
@@ -239,6 +241,9 @@ impl eframe::App for CabalHelperApp {
                          tool.update(ctx, ui, &mut self.settings, self.game_hwnd);
                     }
                 });
+                
+                // Auto-save settings after tool updates
+                self.settings.auto_save();
             }
         });
     }
