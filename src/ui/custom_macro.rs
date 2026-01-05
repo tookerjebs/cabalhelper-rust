@@ -24,9 +24,12 @@ pub fn render_ui(
 ) -> CustomMacroUiAction {
     let mut action = CustomMacroUiAction::None;
     
-    ui.heading("Custom Macro");
-    
-    // Name editing field and delete button
+    if !game_connected {
+        ui.colored_label(egui::Color32::RED, "Please connect to game first (top right)");
+        return CustomMacroUiAction::None;
+    }
+
+    // Name editing field, delete button, and add action buttons in one section
     ui.horizontal(|ui| {
         ui.label("Name:");
         ui.text_edit_singleline(&mut named_macro.name);
@@ -37,22 +40,15 @@ pub fn render_ui(
                 action = CustomMacroUiAction::DeleteMacro;
             }
         }
-    });
-    
-    ui.separator();
-    
-    if !game_connected {
-        ui.colored_label(egui::Color32::RED, "Please connect to game first (top right)");
-        return CustomMacroUiAction::None;
-    }
-
-    // Add Action Dropdown
-    ui.heading("➕ Add Action");
-    ui.horizontal(|ui| {
+        
+        ui.separator();
+        
+        // Add action buttons
         if ui.button("+ Click").clicked() {
             named_macro.settings.actions.push(MacroAction::Click {
                 coordinate: None,
                 button: MouseButton::Left,
+                click_method: crate::settings::ClickMethod::SendMessage,
                 use_mouse_movement: false,
             });
         }
@@ -69,10 +65,9 @@ pub fn render_ui(
     });
 
     ui.add_space(10.0);
-    ui.separator();
 
     // Actions List
-    ui.heading("📋 Actions");
+    ui.heading("Actions");
     if named_macro.settings.actions.is_empty() {
         ui.label("No actions yet. Add some using the buttons above!");
     } else {
@@ -100,7 +95,7 @@ pub fn render_ui(
 
                     ui.vertical(|ui| {
                         match macro_action {
-                            MacroAction::Click { coordinate, button, use_mouse_movement } => {
+                            MacroAction::Click { coordinate, button, click_method, use_mouse_movement: _ } => {
                                 ui.label(format!("{}. Click", idx + 1));
                                 
                                 ui.horizontal(|ui| {
@@ -134,7 +129,13 @@ pub fn render_ui(
                                 });
                                 
                                 ui.horizontal(|ui| {
-                                    ui.checkbox(use_mouse_movement, "Move mouse (slower, visible)");
+                                    ui.label("Click Method:");
+                                    ui.radio_value(click_method, crate::settings::ClickMethod::SendMessage, "Direct")
+                                        .on_hover_text("SendMessage - Default, reliable for most apps");
+                                    ui.radio_value(click_method, crate::settings::ClickMethod::PostMessage, "Async")
+                                        .on_hover_text("PostMessage - Asynchronous, may work where Direct fails");
+                                    ui.radio_value(click_method, crate::settings::ClickMethod::MouseMovement, "Movement")
+                                        .on_hover_text("Mouse Movement - Physically moves cursor (slower, visible)");
                                 });
                             },
                             MacroAction::TypeText { text } => {
@@ -183,39 +184,47 @@ pub fn render_ui(
     }
 
     ui.add_space(10.0);
-    ui.separator();
 
     // Loop Settings
-    ui.heading("🔁 Loop Settings");
+    ui.heading("Loop Settings");
+    
+    // Hint
+    ui.label(egui::RichText::new("Tip: Always add a Delay action to loop infinitely safely!").color(egui::Color32::YELLOW).small());
+
     ui.horizontal(|ui| {
         ui.checkbox(&mut named_macro.settings.loop_enabled, "Enable Loop");
+        
         if named_macro.settings.loop_enabled {
-            ui.label("Repeat:");
-            let mut count_str = named_macro.settings.loop_count.to_string();
-            if ui.text_edit_singleline(&mut count_str).changed() {
-                if let Ok(val) = count_str.parse::<u32>() {
-                    named_macro.settings.loop_count = val.max(1);
+            ui.checkbox(&mut named_macro.settings.infinite_loop, "Infinite");
+            
+            if !named_macro.settings.infinite_loop {
+                ui.label("Repeat:");
+                let mut count_str = named_macro.settings.loop_count.to_string();
+                if ui.text_edit_singleline(&mut count_str).changed() {
+                    if let Ok(val) = count_str.parse::<u32>() {
+                        named_macro.settings.loop_count = val.max(1);
+                    }
                 }
+                ui.label("times");
             }
-            ui.label("times");
         }
     });
 
-    ui.separator();
+    ui.add_space(10.0);
 
     // Control buttons
     if !is_running {
-        if ui.button("▶️ Start Macro").clicked() {
+        if ui.button("Start Macro").clicked() {
             action = CustomMacroUiAction::StartMacro;
         }
     } else {
-        if ui.button("⏹️ Stop").clicked() {
+        if ui.button("Stop").clicked() {
             action = CustomMacroUiAction::StopMacro;
         }
     }
 
     ui.separator();
-    ui.heading("📊 Status");
+    ui.heading("Status");
     ui.label(status);
     
     action

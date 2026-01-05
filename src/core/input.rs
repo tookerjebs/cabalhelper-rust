@@ -24,6 +24,22 @@ pub fn click_at_position(hwnd: HWND, x: i32, y: i32) -> bool {
     }
 }
 
+/// Click at coordinates using PostMessage (async click, frees up mouse)
+pub fn click_at_position_post(hwnd: HWND, x: i32, y: i32) -> bool {
+    unsafe {
+        // Create lParam: low word = x, high word = y
+        let lparam_value = ((y as u32) << 16) | (x as u32 & 0xFFFF);
+        let lparam = LPARAM(lparam_value as isize);
+
+        // Post mouse down and up messages asynchronously
+        use windows::Win32::UI::WindowsAndMessaging::PostMessageA;
+        PostMessageA(hwnd, WM_LBUTTONDOWN, WPARAM(MK_LBUTTON as usize), lparam).ok();
+        PostMessageA(hwnd, WM_LBUTTONUP, WPARAM(0), lparam).ok();
+
+        true
+    }
+}
+
 /// Check if left mouse button is currently down
 pub fn is_left_mouse_down() -> bool {
     unsafe {

@@ -25,7 +25,6 @@ pub fn render_ui(
 ) -> ImageUiAction {
     let mut action = ImageUiAction::None;
 
-    ui.heading("Accept Item");
     ui.label("Automatically finds and clicks an image (e.g., accept button).");
     ui.separator();
     
@@ -64,8 +63,17 @@ pub fn render_ui(
     ui.add_space(10.0);
     ui.label("Search Region (optional - improves performance):");
     ui.horizontal(|ui| {
-        let icon = if search_region.is_some() { "✓" } else { " " };
-        ui.label(format!("[{}] Region", icon));
+        ui.label("Region:");
+        
+        if let Some((left, top, width, height)) = search_region {
+            ui.label(egui::RichText::new(format!("({}, {}, {}x{})", left, top, width, height))
+                .color(egui::Color32::LIGHT_GREEN)
+                .small());
+        } else {
+            ui.label(egui::RichText::new("Not set")
+                .color(egui::Color32::GRAY)
+                .small());
+        }
         
         if is_calibrating {
             if ui.button("Cancel").clicked() {
@@ -86,7 +94,7 @@ pub fn render_ui(
         }
     });
 
-    ui.separator();
+    ui.add_space(10.0);
 
     // Controls
     if is_running {

@@ -47,10 +47,6 @@ impl Tool for ImageClickerTool {
         self.worker.is_running()
     }
 
-    fn get_name(&self) -> &str {
-        "Accept Item"
-    }
-
     fn start(&mut self, app_settings: &crate::settings::AppSettings, game_hwnd: Option<HWND>) {
          let settings = &app_settings.accept_item;
          

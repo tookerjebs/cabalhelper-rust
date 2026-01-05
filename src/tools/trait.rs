@@ -18,7 +18,4 @@ pub trait Tool {
 
     /// Update loop for UI and logic
     fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut AppSettings, game_hwnd: Option<HWND>);
-
-    /// Get tool name for tab identification
-    fn get_name(&self) -> &str;
 }

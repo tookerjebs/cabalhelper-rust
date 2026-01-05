@@ -205,21 +205,11 @@ impl eframe::App for CabalHelperApp {
                 });
             } else {
                 // Normal View
-                let header_action = crate::ui::app_header::render_header(ui);
-                
-                ui.separator();
-                
-                let connection_action = crate::ui::app_header::render_connection_panel(
+                let action = crate::ui::app_header::render_header(
                     ui,
                     &mut self.game_hwnd,
-                    &mut self.status_message // Changed to use status_message instead of game_title
+                    &mut self.status_message
                 );
-                
-                let action = if matches!(connection_action, crate::ui::app_header::HeaderAction::None) {
-                    header_action
-                } else {
-                    connection_action
-                };
                 
                 match action {
                     crate::ui::app_header::HeaderAction::Connect(hwnd) => {

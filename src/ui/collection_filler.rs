@@ -41,7 +41,6 @@ pub fn render_ui(
 ) -> UiAction {
     let mut action = UiAction::None;
     
-    ui.heading("Collection Filler");
     ui.separator();
 
     if !game_connected {
@@ -55,7 +54,7 @@ pub fn render_ui(
     }
 
     // Calibration Section
-    ui.heading("⚙️ Calibration");
+    ui.heading("Calibration");
     
     ui.label("Detection Areas:");
     if let Some(act) = render_area_calibration(ui, "Tabs Area", CalibrationItem::CollectionTabsArea, 
@@ -85,7 +84,7 @@ pub fn render_ui(
     ui.add_space(10.0);
     
     // Settings
-    ui.heading("⚙️ Settings");
+    ui.heading("Settings");
     
     ui.horizontal(|ui| {
         ui.label("Red Dot Image:");
@@ -115,21 +114,21 @@ pub fn render_ui(
         ui.add(egui::Slider::new(&mut settings.red_dot_tolerance, 0.01..=0.99));
     });
 
-    ui.separator();
+    ui.add_space(10.0);
 
     // Control
     if !is_running {
-        if ui.button("▶️ Start").clicked() {
+        if ui.button("Start").clicked() {
             action = UiAction::StartAutomation;
         }
     } else {
-        if ui.button("⏹️ Stop").clicked() {
+        if ui.button("Stop").clicked() {
             action = UiAction::StopAutomation;
         }
     }
 
     ui.separator();
-    ui.heading("📊 Status");
+    ui.heading("Status");
     ui.label(status);
     
     action
@@ -145,8 +144,17 @@ fn render_area_calibration(
 ) -> Option<UiAction> {
     let mut action = None;
     ui.horizontal(|ui| {
-        let icon = if current.is_some() { "✓" } else { " " };
-        ui.label(format!("[{}] {}", icon, label));
+        ui.label(format!("{}:", label));
+        
+        if let Some((left, top, width, height)) = current {
+            ui.label(egui::RichText::new(format!("({}, {}, {}x{})", left, top, width, height))
+                .color(egui::Color32::LIGHT_GREEN)
+                .small());
+        } else {
+            ui.label(egui::RichText::new("Not set")
+                .color(egui::Color32::GRAY)
+                .small());
+        }
 
         let is_this_calibrating = calibrating_item.as_ref() == Some(&item);
         
@@ -181,8 +189,17 @@ fn render_button_calibration(
 ) -> Option<UiAction> {
     let mut action = None;
     ui.horizontal(|ui| {
-        let icon = if current.is_some() { "✓" } else { " " };
-        ui.label(format!("[{}] {}", icon, label));
+        ui.label(format!("{}:", label));
+        
+        if let Some((x, y)) = current {
+            ui.label(egui::RichText::new(format!("({}, {})", x, y))
+                .color(egui::Color32::LIGHT_GREEN)
+                .small());
+        } else {
+            ui.label(egui::RichText::new("Not set")
+                .color(egui::Color32::GRAY)
+                .small());
+        }
 
         let is_this_calibrating = calibrating_item.as_ref() == Some(&item);
 

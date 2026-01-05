@@ -138,6 +138,8 @@ pub enum MacroAction {
     Click {
         coordinate: Option<(i32, i32)>,
         button: MouseButton,
+        #[serde(default)]
+        click_method: ClickMethod,
         use_mouse_movement: bool,
     },
     TypeText {
@@ -146,6 +148,19 @@ pub enum MacroAction {
     Delay {
         milliseconds: u64,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
+pub enum ClickMethod {
+    SendMessage,   // Direct click (current default)
+    PostMessage,   // Async click
+    MouseMovement, // Physical mouse movement
+}
+
+impl Default for ClickMethod {
+    fn default() -> Self {
+        ClickMethod::SendMessage
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
@@ -164,6 +179,8 @@ impl Default for MouseButton {
 pub struct CustomMacroSettings {
     pub actions: Vec<MacroAction>,
     pub loop_enabled: bool,
+    #[serde(default)]
+    pub infinite_loop: bool,
     pub loop_count: u32,
 }
 
@@ -172,6 +189,7 @@ impl Default for CustomMacroSettings {
         Self {
             actions: Vec::new(),
             loop_enabled: false,
+            infinite_loop: false,
             loop_count: 1,
         }
     }

@@ -32,10 +32,10 @@ winres = "0.1"
 
 [profile.release]
 # Performance-First Optimization Profile
-opt-level = 3        # Max speed optimization (Standard Release)
-lto = "thin"          # Link Time Optimization: Better inlining = FASTER + SMALLER
-codegen-units = 1    # Maximize optimization context = FASTER + SMALLER
-panic = "abort"      # Remove crash unwinding code = SMALLER + NEUTRAL SPEED
-strip = true         # Remove debug symbols = SMALLER + NEUTRAL SPEED
+# opt-level = 3        # Max speed optimization (Standard Release)
+# lto = "thin"          # Link Time Optimization: Better inlining = FASTER + SMALLER
+# codegen-units = 1    # Maximize optimization context = FASTER + SMALLER
+# panic = "abort"      # Remove crash unwinding code = SMALLER + NEUTRAL SPEED
+# strip = true         # Remove debug symbols = SMALLER + NEUTRAL SPEED
 
 

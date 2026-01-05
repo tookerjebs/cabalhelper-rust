@@ -45,10 +45,6 @@ impl Tool for CustomMacroTool {
         self.worker.is_running()
     }
 
-    fn get_name(&self) -> &str {
-        "Custom Macro" // Name will be overridden dynamically in app.rs
-    }
-
     fn start(&mut self, app_settings: &crate::settings::AppSettings, game_hwnd: Option<HWND>) {
         if self.macro_index >= app_settings.custom_macros.len() {
             self.worker.set_status("Macro profile not found");
@@ -171,15 +167,27 @@ impl CustomMacroTool {
                 }
             };
 
-            let loop_count = if settings.loop_enabled { settings.loop_count } else { 1 };
+            let mut iteration: u32 = 0;
 
-            for iteration in 0..loop_count {
+            loop {
                 if !*running.lock().unwrap() {
                     break;
                 }
 
+                // Determine if we should exit based on loop settings
                 if settings.loop_enabled {
-                    *status.lock().unwrap() = format!("Loop {}/{}", iteration + 1, loop_count);
+                    if !settings.infinite_loop && iteration >= settings.loop_count {
+                        break;
+                    }
+                    if settings.infinite_loop {
+                         *status.lock().unwrap() = format!("Loop {} (Infinite)", iteration + 1);
+                    } else {
+                         *status.lock().unwrap() = format!("Loop {}/{}", iteration + 1, settings.loop_count);
+                    }
+                } else {
+                    if iteration >= 1 {
+                        break;
+                    }
                 }
 
                 for (idx, action) in settings.actions.iter().enumerate() {
@@ -188,17 +196,25 @@ impl CustomMacroTool {
                     }
 
                     match action {
-                        crate::settings::MacroAction::Click { coordinate, button: _, use_mouse_movement } => {
+                        crate::settings::MacroAction::Click { coordinate, button: _, click_method, use_mouse_movement: _ } => {
                             if let Some((x, y)) = coordinate {
                                 *status.lock().unwrap() = format!("Clicking at ({}, {})", x, y);
                                 
-                                if *use_mouse_movement {
-                                    // Use screen coordinates with mouse movement
-                                    use crate::automation::interaction::click_at_screen;
-                                    click_at_screen(&mut ctx.gui, *x as u32, *y as u32);
-                                } else {
-                                    // Direct click without mouse movement
-                                    click_at_position(game_hwnd, *x, *y);
+                                match click_method {
+                                    crate::settings::ClickMethod::SendMessage => {
+                                        // Direct click without mouse movement (default)
+                                        click_at_position(game_hwnd, *x, *y);
+                                    },
+                                    crate::settings::ClickMethod::PostMessage => {
+                                        // Async click without mouse movement
+                                        use crate::core::input::click_at_position_post;
+                                        click_at_position_post(game_hwnd, *x, *y);
+                                    },
+                                    crate::settings::ClickMethod::MouseMovement => {
+                                        // Use screen coordinates with mouse movement
+                                        use crate::automation::interaction::click_at_screen;
+                                        click_at_screen(&mut ctx.gui, *x as u32, *y as u32);
+                                    },
                                 }
                             } else {
                                 *status.lock().unwrap() = format!("Action {}: Click position not set", idx + 1);
@@ -216,6 +232,8 @@ impl CustomMacroTool {
                         },
                     }
                 }
+                
+                iteration += 1;
             }
             
             if *running.lock().unwrap() {

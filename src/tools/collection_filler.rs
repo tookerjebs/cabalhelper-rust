@@ -43,10 +43,6 @@ impl Tool for CollectionFillerTool {
         self.worker.is_running()
     }
 
-    fn get_name(&self) -> &str {
-        "Collection Filler"
-    }
-
     fn start(&mut self, app_settings: &crate::settings::AppSettings, game_hwnd: Option<HWND>) {
          let settings = &app_settings.collection_filler;
          
