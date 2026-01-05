@@ -1,25 +1,24 @@
 use eframe::egui;
-use crate::tools::heil_clicker::HeilClickerTool;
 use crate::tools::image_clicker::ImageClickerTool;
 use crate::tools::collection_filler::CollectionFillerTool;
-use crate::tools::email_clicker::EmailClickerTool;
 use crate::tools::custom_macro::CustomMacroTool;
 use crate::tools::r#trait::Tool;
 use crate::core::window::is_window_valid;
-use crate::settings::AppSettings;
+use crate::settings::{AppSettings, NamedMacro, MAX_CUSTOM_MACROS};
 use windows::Win32::Foundation::HWND;
 
 // Macro to toggle a tool with mutual exclusion
 
 
 pub struct CabalHelperApp {
-
-    
     // Centralized settings
     settings: AppSettings,
     
-    // Tools collection
+    // Tools collection (hardcoded tools + dynamic macro tools)
     tools: Vec<Box<dyn Tool>>,
+    
+    // Mapping of tool indices to their names (for dynamic macro naming)
+    tool_names: Vec<String>,
     
     // UI State
     selected_tab: String,
@@ -41,27 +40,57 @@ impl Default for CabalHelperApp {
         // Load settings
         let settings = AppSettings::load();
         
-        // Initialize independent tools
-        let tools: Vec<Box<dyn Tool>> = vec![
-            Box::new(HeilClickerTool::default()),
-            Box::new(ImageClickerTool::default()),
-            Box::new(CollectionFillerTool::default()),
-            Box::new(EmailClickerTool::default()),
-            Box::new(CustomMacroTool::default()),
-        ];
+        // Build tools dynamically
+        let (tools, tool_names) = Self::build_tools(&settings);
         
         // Set initial tab to first tool
-        let selected_tab = tools[0].get_name().to_string();
+        let selected_tab = tool_names.get(0).cloned().unwrap_or_else(|| "Image Clicker".to_string());
 
         Self {
             settings,
             tools,
+            tool_names,
             selected_tab,
             game_hwnd: None,
             status_message: "Ready".to_string(),
             is_overlay_mode: false,
             last_window_check: std::time::Instant::now(),
             last_esc_check: std::time::Instant::now(),
+        }
+    }
+}
+
+impl CabalHelperApp {
+    /// Build tools dynamically: hardcoded tools + one tool per custom macro
+    fn build_tools(settings: &AppSettings) -> (Vec<Box<dyn Tool>>, Vec<String>) {
+        let mut tools: Vec<Box<dyn Tool>> = Vec::new();
+        let mut names: Vec<String> = Vec::new();
+        
+        // Hardcoded tools
+        tools.push(Box::new(ImageClickerTool::default()));
+        names.push("Image Clicker".to_string());
+        
+        tools.push(Box::new(CollectionFillerTool::default()));
+        names.push("Collection Filler".to_string());
+        
+        // Dynamic custom macro tools
+        for (idx, named_macro) in settings.custom_macros.iter().enumerate() {
+            tools.push(Box::new(CustomMacroTool::new(idx)));
+            names.push(named_macro.name.clone());
+        }
+        
+        (tools, names)
+    }
+    
+    /// Rebuild tools after settings change (e.g., adding/deleting a macro)
+    fn rebuild_tools(&mut self) {
+        let (tools, names) = Self::build_tools(&self.settings);
+        self.tools = tools;
+        self.tool_names = names;
+        
+        // Ensure selected tab still exists
+        if !self.tool_names.contains(&self.selected_tab) {
+            self.selected_tab = self.tool_names.get(0).cloned().unwrap_or_else(|| "Image Clicker".to_string());
         }
     }
 }
@@ -168,8 +197,8 @@ impl eframe::App for CabalHelperApp {
                             // Start the requested tool
                             self.tools[idx].start(&self.settings, self.game_hwnd);
                             
-                            // Switch to this tool's tab so user can configure and start it from main UI
-                            self.selected_tab = self.tools[idx].get_name().to_string();
+                            // Switch to this tool's tab
+                            self.selected_tab = self.tool_names[idx].clone();
                         }
                         ctx.request_repaint();
                     }
@@ -206,13 +235,16 @@ impl eframe::App for CabalHelperApp {
                         self.is_overlay_mode = true;
                         ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(false));
                         ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::AlwaysOnTop));
-                        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([204.0, 36.0].into())); // Horizontal: 5×36px + 1×24px buttons
+                        
+                        // Dynamic overlay sizing
+                        let num_tools = self.tools.len();
+                        let overlay_width = (num_tools as f32 * 36.0) + 24.0; // 36px per tool + 24px settings button
+                        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([overlay_width, 36.0].into()));
                         
                         // Initial positioning: top-center of game window (one-time only)
                         if let Some(game_hwnd) = self.game_hwnd {
                             if let Some((x, y, w, _h)) = crate::core::window::get_client_rect_in_screen_coords(game_hwnd) {
-                                let overlay_w = 204;
-                                let target_x = x + (w / 2) - (overlay_w / 2);
+                                let target_x = x + (w / 2) - (overlay_width as i32 / 2);
                                 let target_y = y as f32;
                                 ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition([target_x as f32, target_y].into()));
                             }
@@ -225,10 +257,20 @@ impl eframe::App for CabalHelperApp {
             
                 // Dynamic Tab Rendering
                 ui.horizontal(|ui| {
-                    for tool in &self.tools {
-                        let name = tool.get_name();
-                        if ui.selectable_label(self.selected_tab == name, name).clicked() {
-                            self.selected_tab = name.to_string();
+                    for (_idx, name) in self.tool_names.iter().enumerate() {
+                        if ui.selectable_label(self.selected_tab == *name, name).clicked() {
+                            self.selected_tab = name.clone();
+                        }
+                    }
+                    
+                    // Add "+ New Macro" button (only if under max limit)
+                    if self.settings.custom_macros.len() < MAX_CUSTOM_MACROS {
+                        if ui.button("+ New Macro").clicked() {
+                            let new_macro_name = format!("Macro {}", self.settings.custom_macros.len() + 1);
+                            self.settings.custom_macros.push(NamedMacro::new(new_macro_name.clone()));
+                            self.rebuild_tools();
+                            self.selected_tab = new_macro_name;
+                            self.settings.auto_save();
                         }
                     }
                 });
@@ -236,11 +278,20 @@ impl eframe::App for CabalHelperApp {
                 ui.separator();
 
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    // Find the selected tool and update it
-                    if let Some(tool) = self.tools.iter_mut().find(|t| t.get_name() == self.selected_tab) {
-                         tool.update(ctx, ui, &mut self.settings, self.game_hwnd);
+                    // Find the selected tool by name and update it
+                    if let Some(idx) = self.tool_names.iter().position(|name| name == &self.selected_tab) {
+                        if let Some(tool) = self.tools.get_mut(idx) {
+                            tool.update(ctx, ui, &mut self.settings, self.game_hwnd);
+                        }
                     }
                 });
+                
+                // Check if macro count changed (e.g., macro was deleted)
+                // We need to rebuild tools to stay in sync
+                let expected_tool_count = 2 + self.settings.custom_macros.len(); // 2 hardcoded + N macros
+                if self.tools.len() != expected_tool_count {
+                    self.rebuild_tools();
+                }
                 
                 // Auto-save settings after tool updates
                 self.settings.auto_save();

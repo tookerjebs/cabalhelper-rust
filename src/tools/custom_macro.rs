@@ -9,6 +9,9 @@ use crate::ui::custom_macro::{CustomMacroUiAction, render_ui};
 use crate::core::worker::Worker;
 
 pub struct CustomMacroTool {
+    // Which macro profile this tool is managing
+    macro_index: usize,
+    
     // Runtime state (Generic Worker)
     worker: Worker,
     
@@ -17,9 +20,10 @@ pub struct CustomMacroTool {
     calibrating_action_index: Option<usize>,
 }
 
-impl Default for CustomMacroTool {
-    fn default() -> Self {
+impl CustomMacroTool {
+    pub fn new(macro_index: usize) -> Self {
         Self {
+            macro_index,
             worker: Worker::new(),
             calibration: CalibrationManager::new(),
             calibrating_action_index: None,
@@ -42,11 +46,16 @@ impl Tool for CustomMacroTool {
     }
 
     fn get_name(&self) -> &str {
-        "Custom Macro"
+        "Custom Macro" // Name will be overridden dynamically in app.rs
     }
 
     fn start(&mut self, app_settings: &crate::settings::AppSettings, game_hwnd: Option<HWND>) {
-        let settings = &app_settings.custom_macro;
+        if self.macro_index >= app_settings.custom_macros.len() {
+            self.worker.set_status("Macro profile not found");
+            return;
+        }
+        
+        let settings = &app_settings.custom_macros[self.macro_index].settings;
         
         if let Some(hwnd) = game_hwnd {
             if !settings.actions.is_empty() {
@@ -60,14 +69,23 @@ impl Tool for CustomMacroTool {
     }
 
     fn update(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut crate::settings::AppSettings, game_hwnd: Option<HWND>) {
-        let settings = &mut settings.custom_macro;
+        if self.macro_index >= settings.custom_macros.len() {
+            ui.colored_label(egui::Color32::RED, "Error: Macro profile not found");
+            return;
+        }
+        
+        // Can delete this macro if there's more than 1 total
+        // Calculate this BEFORE taking mutable borrow
+        let can_delete = settings.custom_macros.len() > 1;
+        
+        let macro_settings = &mut settings.custom_macros[self.macro_index];
         
         // Handle calibration interaction
         if let Some(hwnd) = game_hwnd {
             if let Some(result) = self.calibration.update(hwnd) {
                 if let CalibrationResult::Point(x, y) = result {
                     if let Some(idx) = self.calibrating_action_index.take() {
-                        if let Some(action) = settings.actions.get_mut(idx) {
+                        if let Some(action) = macro_settings.settings.actions.get_mut(idx) {
                             if let crate::settings::MacroAction::Click { coordinate, .. } = action {
                                 *coordinate = Some((x, y));
                                 self.worker.set_status(&format!("Click position set: ({}, {})", x, y));
@@ -90,12 +108,13 @@ impl Tool for CustomMacroTool {
 
         let action = render_ui(
             ui, 
-            settings,
+            macro_settings,
             is_calibrating,
             self.calibrating_action_index,
             is_running, 
             &status, 
-            game_hwnd.is_some()
+            game_hwnd.is_some(),
+            can_delete
         );
 
         match action {
@@ -112,14 +131,22 @@ impl Tool for CustomMacroTool {
             CustomMacroUiAction::StartMacro => {
                 if game_hwnd.is_none() {
                     self.worker.set_status("Connect to game first");
-                } else if settings.actions.is_empty() {
+                } else if macro_settings.settings.actions.is_empty() {
                     self.worker.set_status("No actions configured");
                 } else {
-                    self.start_macro(settings.clone(), game_hwnd.unwrap());
+                    self.start_macro(macro_settings.settings.clone(), game_hwnd.unwrap());
                 }
             },
             CustomMacroUiAction::StopMacro => {
                 self.stop();
+            },
+            CustomMacroUiAction::DeleteMacro => {
+                // Delete this macro from settings
+                if settings.custom_macros.len() > 1 && self.macro_index < settings.custom_macros.len() {
+                    settings.custom_macros.remove(self.macro_index);
+                    settings.auto_save();
+                    // Note: app.rs needs to rebuild tools after this frame
+                }
             },
             CustomMacroUiAction::None => {}
         }

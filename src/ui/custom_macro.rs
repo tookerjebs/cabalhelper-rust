@@ -1,5 +1,5 @@
 use eframe::egui;
-use crate::settings::{MacroAction, MouseButton, CustomMacroSettings};
+use crate::settings::{MacroAction, MouseButton, NamedMacro};
 
 #[derive(Debug)]
 pub enum CustomMacroUiAction {
@@ -7,23 +7,38 @@ pub enum CustomMacroUiAction {
     CancelCalibration,
     StartMacro,
     StopMacro,
+    DeleteMacro,
     None,
 }
 
 /// Render the Custom Macro Builder UI
 pub fn render_ui(
     ui: &mut egui::Ui,
-    settings: &mut CustomMacroSettings,
+    named_macro: &mut NamedMacro,
     _is_calibrating: bool,
     calibrating_action_index: Option<usize>,
     is_running: bool,
     status: &str,
     game_connected: bool,
+    can_delete: bool, // Can this macro be deleted?
 ) -> CustomMacroUiAction {
     let mut action = CustomMacroUiAction::None;
     
     ui.heading("Custom Macro");
-    ui.label("Build your own automation sequence");
+    
+    // Name editing field and delete button
+    ui.horizontal(|ui| {
+        ui.label("Name:");
+        ui.text_edit_singleline(&mut named_macro.name);
+        
+        // Delete button (only if allowed)
+        if can_delete {
+            if ui.button("🗑 Delete").clicked() {
+                action = CustomMacroUiAction::DeleteMacro;
+            }
+        }
+    });
+    
     ui.separator();
     
     if !game_connected {
@@ -35,19 +50,19 @@ pub fn render_ui(
     ui.heading("➕ Add Action");
     ui.horizontal(|ui| {
         if ui.button("+ Click").clicked() {
-            settings.actions.push(MacroAction::Click {
+            named_macro.settings.actions.push(MacroAction::Click {
                 coordinate: None,
                 button: MouseButton::Left,
                 use_mouse_movement: false,
             });
         }
         if ui.button("+ Type Text").clicked() {
-            settings.actions.push(MacroAction::TypeText {
+            named_macro.settings.actions.push(MacroAction::TypeText {
                 text: String::new(),
             });
         }
         if ui.button("+ Delay").clicked() {
-            settings.actions.push(MacroAction::Delay {
+            named_macro.settings.actions.push(MacroAction::Delay {
                 milliseconds: 100,
             });
         }
@@ -58,26 +73,26 @@ pub fn render_ui(
 
     // Actions List
     ui.heading("📋 Actions");
-    if settings.actions.is_empty() {
+    if named_macro.settings.actions.is_empty() {
         ui.label("No actions yet. Add some using the buttons above!");
     } else {
         let mut to_remove: Option<usize> = None;
         let mut to_move_up: Option<usize> = None;
         let mut to_move_down: Option<usize> = None;
-        let actions_len = settings.actions.len(); // Capture length before iterating
+        let actions_len = named_macro.settings.actions.len(); // Capture length before iterating
 
-        for (idx, macro_action) in settings.actions.iter_mut().enumerate() {
+        for (idx, macro_action) in named_macro.settings.actions.iter_mut().enumerate() {
             ui.group(|ui| {
                 ui.horizontal(|ui| {
                     // Order controls
                     ui.vertical(|ui| {
                         if idx > 0 {
-                            if ui.small_button("▲").clicked() {
+                            if ui.small_button("^").clicked() {
                                 to_move_up = Some(idx);
                             }
                         }
                         if idx < actions_len - 1 {
-                            if ui.small_button("▼").clicked() {
+                            if ui.small_button("v").clicked() {
                                 to_move_down = Some(idx);
                             }
                         }
@@ -157,13 +172,13 @@ pub fn render_ui(
 
         // Handle reordering
         if let Some(idx) = to_move_up {
-            settings.actions.swap(idx, idx - 1);
+            named_macro.settings.actions.swap(idx, idx - 1);
         }
         if let Some(idx) = to_move_down {
-            settings.actions.swap(idx, idx + 1);
+            named_macro.settings.actions.swap(idx, idx + 1);
         }
         if let Some(idx) = to_remove {
-            settings.actions.remove(idx);
+            named_macro.settings.actions.remove(idx);
         }
     }
 
@@ -173,13 +188,13 @@ pub fn render_ui(
     // Loop Settings
     ui.heading("🔁 Loop Settings");
     ui.horizontal(|ui| {
-        ui.checkbox(&mut settings.loop_enabled, "Enable Loop");
-        if settings.loop_enabled {
+        ui.checkbox(&mut named_macro.settings.loop_enabled, "Enable Loop");
+        if named_macro.settings.loop_enabled {
             ui.label("Repeat:");
-            let mut count_str = settings.loop_count.to_string();
+            let mut count_str = named_macro.settings.loop_count.to_string();
             if ui.text_edit_singleline(&mut count_str).changed() {
                 if let Ok(val) = count_str.parse::<u32>() {
-                    settings.loop_count = val.max(1);
+                    named_macro.settings.loop_count = val.max(1);
                 }
             }
             ui.label("times");

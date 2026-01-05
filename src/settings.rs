@@ -1,22 +1,26 @@
 use serde::{Serialize, Deserialize};
 use std::fs;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     #[serde(default)]
     pub collection_filler: CollectionFillerSettings,
     
     #[serde(default)]
-    pub heil_clicker: HeilClickerSettings,
-    
-    #[serde(default)]
     pub accept_item: AcceptItemSettings,
     
     #[serde(default)]
-    pub email_clicker: EmailClickerSettings,
-    
-    #[serde(default)]
-    pub custom_macro: CustomMacroSettings,
+    pub custom_macros: Vec<NamedMacro>,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            collection_filler: CollectionFillerSettings::default(),
+            accept_item: AcceptItemSettings::default(),
+            custom_macros: vec![NamedMacro::default()],
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,21 +94,6 @@ fn default_red_dot_path() -> String {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HeilClickerSettings {
-    pub click_position: Option<(i32, i32)>,
-    pub interval_ms: u64,
-}
-
-impl Default for HeilClickerSettings {
-    fn default() -> Self {
-        Self {
-            click_position: None,
-            interval_ms: 1000,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcceptItemSettings {
     pub image_path: String,
     pub interval_ms: u64,
@@ -123,23 +112,24 @@ impl Default for AcceptItemSettings {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmailClickerSettings {
-    pub receive_position: Option<(i32, i32)>,  // "Receive" button position
-    pub next_position: Option<(i32, i32)>,      // "Next" button position
-    pub cycles: u32,                             // How many emails to collect
-    pub interval_ms: u64,                        // Delay between clicks
+pub struct NamedMacro {
+    pub name: String,
+    pub settings: CustomMacroSettings,
 }
 
-impl Default for EmailClickerSettings {
-    fn default() -> Self {
+impl NamedMacro {
+    pub fn new(name: String) -> Self {
         Self {
-            receive_position: None,
-            next_position: None,
-            cycles: 10,
-            interval_ms: 200,
+            name,
+            settings: CustomMacroSettings::default(),
         }
+    }
+}
+
+impl Default for NamedMacro {
+    fn default() -> Self {
+        Self::new("My Macro".to_string())
     }
 }
 
@@ -187,6 +177,8 @@ impl Default for CustomMacroSettings {
     }
 }
 
+pub const MAX_CUSTOM_MACROS: usize = 10;
+
 impl AppSettings {
     const SETTINGS_FILE: &'static str = "cabalhelper_settings.json";
     
@@ -194,8 +186,12 @@ impl AppSettings {
     pub fn load() -> Self {
         match fs::read_to_string(Self::SETTINGS_FILE) {
             Ok(contents) => {
-                match serde_json::from_str(&contents) {
-                    Ok(settings) => {
+                match serde_json::from_str::<AppSettings>(&contents) {
+                    Ok(mut settings) => {
+                        // Ensure we have at least one macro
+                        if settings.custom_macros.is_empty() {
+                            settings.custom_macros.push(NamedMacro::default());
+                        }
                         settings
                     },
                     Err(_) => {
