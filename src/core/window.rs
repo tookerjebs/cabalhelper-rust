@@ -2,23 +2,10 @@ use windows::{
     Win32::Foundation::{HWND, POINT},
     Win32::UI::WindowsAndMessaging::{
         FindWindowA, GetWindowRect, IsWindow, WindowFromPoint, GetCursorPos, GetAncestor, GA_PARENT,
-        GetClientRect, GetWindowTextA, GetWindowThreadProcessId,
+        GetClientRect, GetWindowTextA,
     },
     Win32::Graphics::Gdi::{ScreenToClient, ClientToScreen, GetDC, GetPixel, ReleaseDC},
 };
-
-/// Get process ID from window handle
-pub fn get_process_id(hwnd: HWND) -> Option<u32> {
-    unsafe {
-        let mut pid: u32 = 0;
-        GetWindowThreadProcessId(hwnd, Some(&mut pid));
-        if pid != 0 {
-            Some(pid)
-        } else {
-            None
-        }
-    }
-}
 
 /// Find game window
 /// Searches for "D3D Window" class (universal for all Cabal versions)

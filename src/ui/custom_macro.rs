@@ -29,124 +29,158 @@ pub fn render_ui(
         return CustomMacroUiAction::None;
     }
 
-    // Name editing field and delete button
-    ui.horizontal(|ui| {
-        ui.label("Name:");
-        ui.text_edit_singleline(&mut named_macro.name);
-        
-        // Delete button (only if allowed)
-        if can_delete {
-            if ui.button("🗑 Delete").clicked() {
-                action = CustomMacroUiAction::DeleteMacro;
+    // 1. Header Section (Grouped)
+    ui.group(|ui| {
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Macro Name:").strong());
+            ui.text_edit_singleline(&mut named_macro.name);
+            
+            if can_delete {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button(egui::RichText::new("Delete").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
+                        action = CustomMacroUiAction::DeleteMacro;
+                    }
+                });
             }
-        }
-    });
-    
-    // Add action buttons on a new line
-    ui.horizontal(|ui| {
-        if ui.button("+ Click").clicked() {
-            named_macro.settings.actions.push(MacroAction::Click {
-                coordinate: None,
-                button: MouseButton::Left,
-                click_method: crate::settings::ClickMethod::SendMessage,
-                use_mouse_movement: false,
-            });
-        }
-        if ui.button("+ Type Text").clicked() {
-            named_macro.settings.actions.push(MacroAction::TypeText {
-                text: String::new(),
-            });
-        }
-        if ui.button("+ Delay").clicked() {
-            named_macro.settings.actions.push(MacroAction::Delay {
-                milliseconds: 100,
-            });
-        }
+        });
+        
+        ui.add_space(8.0);
+        
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Add Action:").strong());
+            if ui.button("Click").clicked() {
+                named_macro.settings.actions.push(MacroAction::Click {
+                    coordinate: None,
+                    button: MouseButton::Left,
+                    click_method: crate::settings::ClickMethod::SendMessage,
+                    use_mouse_movement: false,
+                });
+            }
+            if ui.button("Type Text").clicked() {
+                named_macro.settings.actions.push(MacroAction::TypeText {
+                    text: String::new(),
+                });
+            }
+            if ui.button("Delay").clicked() {
+                named_macro.settings.actions.push(MacroAction::Delay {
+                    milliseconds: 100,
+                });
+            }
+        });
     });
 
-    ui.add_space(10.0);
+    ui.add_space(12.0);
 
-    // Actions List
-    ui.heading("Actions");
+    // 2. Actions List Section
+    ui.heading(egui::RichText::new("Actions").size(16.0).strong());
+    ui.add_space(4.0);
+
     if named_macro.settings.actions.is_empty() {
-        ui.label("No actions yet. Add some using the buttons above!");
+        ui.label(egui::RichText::new("No actions yet. Add some using the buttons above!").italics());
     } else {
         let mut to_remove: Option<usize> = None;
         let mut to_move_up: Option<usize> = None;
         let mut to_move_down: Option<usize> = None;
-        let actions_len = named_macro.settings.actions.len(); // Capture length before iterating
+        let actions_len = named_macro.settings.actions.len();
 
         for (idx, macro_action) in named_macro.settings.actions.iter_mut().enumerate() {
             ui.group(|ui| {
+                ui.set_min_width(ui.available_width());
+                
                 ui.horizontal(|ui| {
-                    // Order controls
+                    // Reorder buttons (Vertical, Left) - Removed separator
                     ui.vertical(|ui| {
+                        ui.add_space(2.0); // slight top offset
                         if idx > 0 {
-                            if ui.small_button("^").clicked() {
+                            if ui.button("⬆").on_hover_text("Move Up").clicked() {
                                 to_move_up = Some(idx);
                             }
+                        } else {
+                             ui.add_space(20.0); // approximate button height placeholder
                         }
+                        
                         if idx < actions_len - 1 {
-                            if ui.small_button("v").clicked() {
+                             if ui.button("⬇").on_hover_text("Move Down").clicked() {
                                 to_move_down = Some(idx);
                             }
                         }
                     });
 
+                    ui.add_space(8.0);
+
+                    // Main Content
                     ui.vertical(|ui| {
+                        // Title Row
+                        ui.horizontal(|ui| {
+                            let title = match macro_action {
+                                MacroAction::Click { .. } => "Click",
+                                MacroAction::TypeText { .. } => "Type Text",
+                                MacroAction::Delay { .. } => "Delay",
+                            };
+                            
+                            ui.label(egui::RichText::new(format!("{}. {}", idx + 1, title)).strong().size(14.0));
+                            
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.small_button(egui::RichText::new("DEL").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
+                                    to_remove = Some(idx);
+                                }
+                            });
+                        });
+
+                        ui.add_space(6.0);
+
+                        // Config Fields
                         match macro_action {
                             MacroAction::Click { coordinate, button, click_method, use_mouse_movement: _ } => {
-                                ui.label(format!("{}. Click", idx + 1));
-                                
                                 ui.horizontal(|ui| {
                                     ui.label("Position:");
                                     if let Some((x, y)) = coordinate {
-                                        ui.label(format!("({}, {})", x, y));
+                                        ui.label(egui::RichText::new(format!("({}, {})", x, y)).monospace().strong());
                                     } else {
-                                        ui.colored_label(egui::Color32::RED, "Not set");
+                                        ui.colored_label(egui::Color32::from_rgb(255, 100, 100), "Not set");
                                     }
                                     
                                     let is_this_calibrating = calibrating_action_index == Some(idx);
                                     if is_this_calibrating {
-                                        if ui.button("Cancel").clicked() {
+                                        if ui.button(egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
                                             action = CustomMacroUiAction::CancelCalibration;
                                         }
-                                        ui.label("Click on game...");
+                                        ui.label(egui::RichText::new("Click on game...").color(egui::Color32::YELLOW));
                                     } else {
-                                        if ui.button("Set Position").clicked() {
-                                            action = CustomMacroUiAction::StartCalibration(idx);
+                                        if ui.button("Set").clicked() {
+                                             action = CustomMacroUiAction::StartCalibration(idx);
                                         }
-                                        if coordinate.is_some() && ui.button("Clear").clicked() {
+                                        if coordinate.is_some() && ui.button("Clear").on_hover_text("Clear Position").clicked() {
                                             *coordinate = None;
                                         }
                                     }
                                 });
+                                ui.add_space(2.0);
                                 
                                 ui.horizontal(|ui| {
-                                    ui.label("Mouse Button:");
+                                    ui.label("Button:");
                                     ui.radio_value(button, MouseButton::Left, "Left");
                                     ui.radio_value(button, MouseButton::Right, "Right");
                                 });
-                                
+                                ui.add_space(2.0);
+
                                 ui.horizontal(|ui| {
-                                    ui.label("Click Method:");
+                                    ui.label("Method:");
                                     ui.radio_value(click_method, crate::settings::ClickMethod::SendMessage, "Direct")
                                         .on_hover_text("SendMessage - Default, reliable for most apps");
                                     ui.radio_value(click_method, crate::settings::ClickMethod::PostMessage, "Async")
                                         .on_hover_text("PostMessage - Asynchronous, may work where Direct fails");
-                                    ui.radio_value(click_method, crate::settings::ClickMethod::MouseMovement, "Movement")
-                                        .on_hover_text("Mouse Movement - Physically moves cursor (slower, visible)");
+                                    ui.radio_value(click_method, crate::settings::ClickMethod::MouseMovement, "Move")
+                                        .on_hover_text("Mouse Movement - Physically moves cursor");
                                 });
                             },
                             MacroAction::TypeText { text } => {
-                                ui.label(format!("{}. Type Text", idx + 1));
                                 ui.horizontal(|ui| {
                                     ui.label("Text:");
                                     ui.text_edit_singleline(text);
                                 });
                             },
                             MacroAction::Delay { milliseconds } => {
-                                ui.label(format!("{}. Delay", idx + 1));
                                 ui.horizontal(|ui| {
                                     ui.label("Duration (ms):");
                                     let mut ms_str = milliseconds.to_string();
@@ -159,73 +193,97 @@ pub fn render_ui(
                             },
                         }
                     });
-
-                    // Delete button
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("🗑").clicked() {
-                            to_remove = Some(idx);
-                        }
-                    });
                 });
             });
-            ui.add_space(5.0);
+            ui.add_space(8.0);
         }
 
-        // Handle reordering
+        if let Some(idx) = to_remove {
+            named_macro.settings.actions.remove(idx);
+        }
         if let Some(idx) = to_move_up {
             named_macro.settings.actions.swap(idx, idx - 1);
         }
         if let Some(idx) = to_move_down {
             named_macro.settings.actions.swap(idx, idx + 1);
         }
-        if let Some(idx) = to_remove {
-            named_macro.settings.actions.remove(idx);
-        }
     }
 
-    ui.add_space(10.0);
+    ui.add_space(12.0);
 
-    // Loop Settings
-    ui.heading("Loop Settings");
-    
-    // Hint
-    ui.label(egui::RichText::new("Tip: Always add a Delay action to loop infinitely safely!").color(egui::Color32::YELLOW).small());
-
-    ui.horizontal(|ui| {
-        ui.checkbox(&mut named_macro.settings.loop_enabled, "Enable Loop");
+    // 3. Loop Settings Section
+    ui.group(|ui| {
+        ui.heading(egui::RichText::new("Loop Settings").size(14.0).strong());
+        ui.add_space(4.0);
         
-        if named_macro.settings.loop_enabled {
-            ui.checkbox(&mut named_macro.settings.infinite_loop, "Infinite");
-            
-            if !named_macro.settings.infinite_loop {
-                ui.label("Repeat:");
-                let mut count_str = named_macro.settings.loop_count.to_string();
-                if ui.text_edit_singleline(&mut count_str).changed() {
-                    if let Ok(val) = count_str.parse::<u32>() {
-                        named_macro.settings.loop_count = val.max(1);
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Don't forget to add delays between actions!")
+                .color(egui::Color32::from_rgb(255, 200, 100)).size(12.0));
+        });
+        
+        ui.add_space(8.0);
+        
+        ui.horizontal(|ui| {
+             ui.checkbox(&mut named_macro.settings.loop_enabled, "Enable Loop");
+             
+             if named_macro.settings.loop_enabled {
+                ui.separator();
+                ui.checkbox(&mut named_macro.settings.infinite_loop, "Infinite");
+                
+                if !named_macro.settings.infinite_loop {
+                    ui.label("Repeat:");
+                    let mut count_str = named_macro.settings.loop_count.to_string();
+                    if ui.text_edit_singleline(&mut count_str).changed() {
+                        if let Ok(val) = count_str.parse::<u32>() {
+                            named_macro.settings.loop_count = val.max(1);
+                        }
                     }
+                    ui.label("times");
                 }
-                ui.label("times");
-            }
+             }
+        });
+    });
+
+    ui.add_space(12.0);
+
+    // 4. Control Buttons
+    ui.vertical_centered(|ui| {
+        let (btn_text, btn_color) = if is_running {
+            ("Stop Macro", egui::Color32::from_rgb(255, 100, 100))
+        } else {
+            ("Start Macro", egui::Color32::from_rgb(100, 255, 100))
+        };
+        
+        let button = egui::Button::new(egui::RichText::new(btn_text).size(16.0).color(btn_color))
+            .min_size(egui::vec2(200.0, 35.0));
+        
+        if ui.add(button).clicked() {
+            action = if is_running {
+                CustomMacroUiAction::StopMacro
+            } else {
+                CustomMacroUiAction::StartMacro
+            };
         }
     });
 
-    ui.add_space(10.0);
-
-    // Control buttons
-    if !is_running {
-        if ui.button("Start Macro").clicked() {
-            action = CustomMacroUiAction::StartMacro;
-        }
-    } else {
-        if ui.button("Stop").clicked() {
-            action = CustomMacroUiAction::StopMacro;
-        }
-    }
-
+    ui.add_space(12.0);
     ui.separator();
-    ui.heading("Status");
-    ui.label(status);
+    ui.add_space(6.0);
+
+    // 5. Status Section
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Status:").strong());
+        
+        let status_color = if status.contains("Running") || status.contains("Active") {
+            egui::Color32::from_rgb(100, 255, 100)
+        } else if status.contains("Error") || status.contains("Failed") {
+            egui::Color32::from_rgb(255, 100, 100)
+        } else {
+            egui::Color32::GRAY
+        };
+        
+        ui.label(egui::RichText::new(status).color(status_color));
+    });
     
     action
 }

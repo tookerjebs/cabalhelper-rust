@@ -20,49 +20,48 @@ pub fn render_header(
     let mut action = HeaderAction::None;
     
     ui.horizontal(|ui| {
-        // --- Left Side: Game Connection ---
-        if game_hwnd.is_none() {
-            if ui.button("🔌 Connect").clicked() {
-                if let Some((hwnd, title)) = find_game_window() {
-                    *game_hwnd = Some(hwnd);
-                    *game_title = title;
-                    action = HeaderAction::Connect(hwnd);
-                } else {
-                    *game_title = "No D3D Window found".to_string();
-                }
-            }
-            ui.label(egui::RichText::new(game_title.as_str()).color(egui::Color32::GRAY));
-        } else {
+        // --- Left Side: Game Connection Status Text only ---
+        if let Some(hwnd) = game_hwnd {
             ui.label(egui::RichText::new(game_title.as_str()).color(egui::Color32::GREEN).strong());
             
-            // Show window info: resolution, position, PID
-            if let Some(hwnd) = game_hwnd {
-                if let Some((_, _, w, h)) = crate::core::window::get_client_rect_in_screen_coords(*hwnd) {
-                    ui.label(egui::RichText::new("•").color(egui::Color32::DARK_GRAY));
-                    ui.label(egui::RichText::new(format!("{}x{}", w, h)).color(egui::Color32::LIGHT_GRAY).small());
-                }
-                
-                if let Some(pid) = crate::core::window::get_process_id(*hwnd) {
-                    ui.label(egui::RichText::new("•").color(egui::Color32::DARK_GRAY));
-                    ui.label(egui::RichText::new(format!("PID: {}", pid)).color(egui::Color32::LIGHT_GRAY).small());
-                }
+            // Show minimal window info: just resolution
+            if let Some((_, _, w, h)) = crate::core::window::get_client_rect_in_screen_coords(*hwnd) {
+                ui.label(egui::RichText::new("•").color(egui::Color32::DARK_GRAY));
+                ui.label(egui::RichText::new(format!("{}x{}", w, h)).color(egui::Color32::LIGHT_GRAY).small());
             }
-            
-            if ui.button("❌ Disconnect").clicked() {
-                *game_hwnd = None;
-                *game_title = "Disconnected".to_string();
-                action = HeaderAction::Disconnect;
-            }
+        } else {
+            ui.label(egui::RichText::new("Not Connected").color(egui::Color32::GRAY));
         }
 
-        // --- Right Side: Utility Buttons ---
+        // --- Right Side: All Buttons ---
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button("👁 Overlay").clicked() {
-                action = HeaderAction::ToggleOverlay;
+             // Save Settings
+            if ui.button("Save Settings").clicked() {
+                action = HeaderAction::Save;
             }
             
-            if ui.button("💾 Save Settings").clicked() {
-                action = HeaderAction::Save;
+            // Overlay Toggle (No Icon)
+            if ui.button("Overlay").clicked() {
+                action = HeaderAction::ToggleOverlay;
+            }
+
+            // Connect/Disconnect Button
+            if game_hwnd.is_none() {
+                if ui.button("Connect").clicked() {
+                    if let Some((hwnd, title)) = find_game_window() {
+                        *game_hwnd = Some(hwnd);
+                        *game_title = title;
+                        action = HeaderAction::Connect(hwnd);
+                    } else {
+                        *game_title = "No D3D Window found".to_string();
+                    }
+                }
+            } else {
+                if ui.button("Disconnect").clicked() {
+                    *game_hwnd = None;
+                    *game_title = "Disconnected".to_string();
+                    action = HeaderAction::Disconnect;
+                }
             }
         });
     });

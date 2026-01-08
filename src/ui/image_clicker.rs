@@ -25,93 +25,136 @@ pub fn render_ui(
 ) -> ImageUiAction {
     let mut action = ImageUiAction::None;
 
-    ui.label("Automatically finds and clicks an image (e.g., accept button).");
-    ui.separator();
+    // Introduction
+    ui.label(egui::RichText::new("Automatically finds and clicks an image (e.g., accept button).").italics());
     
     if !game_connected {
         ui.colored_label(egui::Color32::RED, "Please connect to game first (top right)");
         return ImageUiAction::None;
     }
-
-    // Settings
-    ui.horizontal(|ui| {
-        ui.label("Image Path:");
-        ui.text_edit_singleline(image_path);
-        if ui.button("📁 Browse...").clicked() {
-            if let Some(path) = rfd::FileDialog::new()
-                .add_filter("Image Files", &["png", "jpg", "jpeg", "bmp"])
-                .set_title("Select Target Image")
-                .set_directory(std::env::current_dir().unwrap_or_default())
-                .pick_file()
-            {
-                *image_path = path.display().to_string();
-            }
-        }
-    });
     
-    ui.horizontal(|ui| {
-        ui.label("Interval (ms):");
-        ui.text_edit_singleline(interval_ms);
+    ui.add_space(8.0);
+
+    // 1. Settings Group
+    ui.group(|ui| {
+        ui.heading(egui::RichText::new("Configuration").size(14.0).strong());
+        ui.add_space(4.0);
+        
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Image Path:").strong());
+            ui.text_edit_singleline(image_path);
+            if ui.button("Browse...").clicked() {
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("Image Files", &["png", "jpg", "jpeg", "bmp"])
+                    .set_title("Select Target Image")
+                    .set_directory(std::env::current_dir().unwrap_or_default())
+                    .pick_file()
+                {
+                    *image_path = path.display().to_string();
+                }
+            }
+        });
+        
+        ui.add_space(4.0);
+        
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Interval (ms):").strong());
+            ui.text_edit_singleline(interval_ms);
+        });
+        
+        ui.add_space(4.0);
+
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Confidence:").strong());
+            ui.add(egui::Slider::new(tolerance, 0.01..=0.99));
+        });
     });
 
-    ui.horizontal(|ui| {
-        ui.label("Min Confidence (0.0 - 1.0):");
-        ui.add(egui::Slider::new(tolerance, 0.01..=0.99));
-    });
+    ui.add_space(12.0);
     
-    // Region calibration
-    ui.add_space(10.0);
-    ui.label("Search Region (optional - improves performance):");
-    ui.horizontal(|ui| {
-        ui.label("Region:");
+    // 2. Region Group
+    ui.group(|ui| {
+        ui.heading(egui::RichText::new("Detection Area").size(14.0).strong());
+        ui.add_space(4.0);
         
-        if let Some((left, top, width, height)) = search_region {
-            ui.label(egui::RichText::new(format!("({}, {}, {}x{})", left, top, width, height))
-                .color(egui::Color32::LIGHT_GREEN)
-                .small());
-        } else {
-            ui.label(egui::RichText::new("Not set")
-                .color(egui::Color32::GRAY)
-                .small());
-        }
-        
-        if is_calibrating {
-            if ui.button("Cancel").clicked() {
-                action = ImageUiAction::CancelCalibration;
-            }
-            if is_waiting_for_second_click {
-                ui.label("Click BOTTOM-RIGHT");
+        ui.label(egui::RichText::new("Optional: Improve performance by limiting search area.").small().color(egui::Color32::GRAY));
+        ui.add_space(4.0);
+
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Region:").strong());
+            
+            if let Some((left, top, width, height)) = search_region {
+                ui.label(egui::RichText::new(format!("({}, {}, {}x{})", left, top, width, height))
+                    .monospace()
+                    .strong());
             } else {
-                ui.label("Click TOP-LEFT");
+                ui.label(egui::RichText::new("Not set (Full Screen)")
+                    .color(egui::Color32::YELLOW)
+                    .italics());
             }
+            
+            ui.separator();
+
+            if is_calibrating {
+                if ui.button(egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
+                    action = ImageUiAction::CancelCalibration;
+                }
+                if is_waiting_for_second_click {
+                    ui.label(egui::RichText::new("Click BOTTOM-RIGHT...").color(egui::Color32::YELLOW));
+                } else {
+                    ui.label(egui::RichText::new("Click TOP-LEFT...").color(egui::Color32::YELLOW));
+                }
+            } else {
+                if ui.button("Set Region").clicked() {
+                    action = ImageUiAction::StartRegionCalibration;
+                }
+                if search_region.is_some() && ui.button("Clear").on_hover_text("Clear Region").clicked() {
+                    action = ImageUiAction::ClearRegion;
+                }
+            }
+        });
+    });
+
+    ui.add_space(12.0);
+
+    // 3. Controls
+    ui.vertical_centered(|ui| {
+        let (btn_text, btn_color) = if is_running {
+            ("Stop Image Clicker", egui::Color32::from_rgb(255, 100, 100))
         } else {
-            if ui.button("Set Region").clicked() {
-                action = ImageUiAction::StartRegionCalibration;
-            }
-            if search_region.is_some() && ui.button("Clear").clicked() {
-                action = ImageUiAction::ClearRegion;
-            }
+            ("Start Image Clicker", egui::Color32::from_rgb(100, 255, 100))
+        };
+        
+        let button = egui::Button::new(egui::RichText::new(btn_text).size(16.0).color(btn_color))
+            .min_size(egui::vec2(200.0, 35.0));
+        
+        if ui.add(button).clicked() {
+            action = if is_running {
+                ImageUiAction::Stop
+            } else {
+                ImageUiAction::Start
+            };
         }
     });
 
-    ui.add_space(10.0);
-
-    // Controls
-    if is_running {
-        ui.colored_label(egui::Color32::GREEN, "RUNNING");
-        if ui.button("Stop").clicked() {
-            action = ImageUiAction::Stop;
-        }
-    } else {
-        if ui.button("Start").clicked() {
-            action = ImageUiAction::Start;
-        }
-    }
-
+    ui.add_space(12.0);
     ui.separator();
+    ui.add_space(6.0);
     
-    // Status
-    ui.label(format!("Status: {}", status));
+    // 4. Status
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Status:").strong());
+        
+        let status_color = if status.contains("Running") || status.contains("Active") {
+            egui::Color32::from_rgb(100, 255, 100)
+        } else if status.contains("Error") || status.contains("Failed") {
+            egui::Color32::from_rgb(255, 100, 100)
+        } else {
+            egui::Color32::GRAY
+        };
+        
+        ui.label(egui::RichText::new(status).color(status_color));
+    });
     
     action
 }

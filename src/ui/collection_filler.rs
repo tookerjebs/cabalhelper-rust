@@ -41,8 +41,6 @@ pub fn render_ui(
 ) -> UiAction {
     let mut action = UiAction::None;
     
-    ui.separator();
-
     if !game_connected {
         ui.colored_label(egui::Color32::RED, "Please connect to game first (top right)");
         return UiAction::None;
@@ -52,84 +50,125 @@ pub fn render_ui(
     if calibration.is_active() {
         ctx.request_repaint();
     }
+    
+    ui.add_space(8.0);
 
-    // Calibration Section
-    ui.heading("Calibration");
-    
-    ui.label("Detection Areas:");
-    if let Some(act) = render_area_calibration(ui, "Tabs Area", CalibrationItem::CollectionTabsArea, 
-        settings.collection_tabs_area, calibrating_item, calibration) { action = act; }
-    if let Some(act) = render_area_calibration(ui, "Dungeon List", CalibrationItem::DungeonListArea, 
-        settings.dungeon_list_area, calibrating_item, calibration) { action = act; }
-    if let Some(act) = render_area_calibration(ui, "Items Area", CalibrationItem::CollectionItemsArea, 
-        settings.collection_items_area, calibrating_item, calibration) { action = act; }
-    
-    ui.add_space(10.0);
-    ui.label("Action Buttons:");
-    if let Some(act) = render_button_calibration(ui, "Auto Refill", CalibrationItem::AutoRefillButton, 
-        settings.auto_refill_pos, calibrating_item, calibration) { action = act; }
-    if let Some(act) = render_button_calibration(ui, "Register", CalibrationItem::RegisterButton, 
-        settings.register_pos, calibrating_item, calibration) { action = act; }
-    if let Some(act) = render_button_calibration(ui, "Yes", CalibrationItem::YesButton, 
-        settings.yes_pos, calibrating_item, calibration) { action = act; }
-    if let Some(act) = render_button_calibration(ui, "Page 2", CalibrationItem::Page2Button, 
-        settings.page_2_pos, calibrating_item, calibration) { action = act; }
-    if let Some(act) = render_button_calibration(ui, "Page 3", CalibrationItem::Page3Button, 
-        settings.page_3_pos, calibrating_item, calibration) { action = act; }
-    if let Some(act) = render_button_calibration(ui, "Page 4", CalibrationItem::Page4Button, 
-        settings.page_4_pos, calibrating_item, calibration) { action = act; }
-    if let Some(act) = render_button_calibration(ui, "Arrow Right", CalibrationItem::ArrowRightButton, 
-        settings.arrow_right_pos, calibrating_item, calibration) { action = act; }
-
-    ui.add_space(10.0);
-    
-    // Settings
-    ui.heading("Settings");
-    
-    ui.horizontal(|ui| {
-        ui.label("Red Dot Image:");
-        ui.text_edit_singleline(&mut settings.red_dot_path);
-        if ui.button("📁 Browse...").clicked() {
-            if let Some(path) = rfd::FileDialog::new()
-                .add_filter("Image Files", &["png", "jpg", "jpeg", "bmp"])
-                .set_title("Select Red Dot Image")
-                .set_directory(std::env::current_dir().unwrap_or_default())
-                .pick_file()
-            {
-                settings.red_dot_path = path.display().to_string();
+    // 1. Settings Group
+    ui.group(|ui| {
+        ui.heading(egui::RichText::new("Configuration").size(14.0).strong());
+        ui.add_space(4.0);
+        
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Red Dot Image:").strong());
+            ui.text_edit_singleline(&mut settings.red_dot_path);
+            if ui.button("Browse...").clicked() {
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("Image Files", &["png", "jpg", "jpeg", "bmp"])
+                    .set_title("Select Red Dot Image")
+                    .set_directory(std::env::current_dir().unwrap_or_default())
+                    .pick_file()
+                {
+                    settings.red_dot_path = path.display().to_string();
+                }
             }
+        });
+        
+        ui.add_space(4.0);
+        
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Delay (ms):").strong());
+            let mut delay = settings.delay_ms.to_string();
+            if ui.text_edit_singleline(&mut delay).changed() {
+                if let Ok(v) = delay.parse() { settings.delay_ms = v; }
+            }
+        });
+
+        ui.add_space(4.0);
+
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Red Dot Tolerance:").strong());
+            ui.add(egui::Slider::new(&mut settings.red_dot_tolerance, 0.01..=0.99));
+        });
+    });
+
+    ui.add_space(12.0);
+
+    // 2. Calibration Section
+    ui.group(|ui| {
+        ui.heading(egui::RichText::new("Calibration").size(14.0).strong());
+        ui.add_space(4.0);
+        
+        ui.label(egui::RichText::new("Detection Areas:").strong().underline());
+        ui.add_space(4.0);
+        
+        if let Some(act) = render_area_calibration(ui, "Tabs Area", CalibrationItem::CollectionTabsArea, 
+            settings.collection_tabs_area, calibrating_item, calibration) { action = act; }
+        if let Some(act) = render_area_calibration(ui, "Dungeon List", CalibrationItem::DungeonListArea, 
+            settings.dungeon_list_area, calibrating_item, calibration) { action = act; }
+        if let Some(act) = render_area_calibration(ui, "Items Area", CalibrationItem::CollectionItemsArea, 
+            settings.collection_items_area, calibrating_item, calibration) { action = act; }
+        
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new("Action Buttons:").strong().underline());
+        ui.add_space(4.0);
+        
+        if let Some(act) = render_button_calibration(ui, "Auto Refill", CalibrationItem::AutoRefillButton, 
+            settings.auto_refill_pos, calibrating_item, calibration) { action = act; }
+        if let Some(act) = render_button_calibration(ui, "Register", CalibrationItem::RegisterButton, 
+            settings.register_pos, calibrating_item, calibration) { action = act; }
+        if let Some(act) = render_button_calibration(ui, "Yes", CalibrationItem::YesButton, 
+            settings.yes_pos, calibrating_item, calibration) { action = act; }
+        ui.separator();
+        if let Some(act) = render_button_calibration(ui, "Page 2", CalibrationItem::Page2Button, 
+            settings.page_2_pos, calibrating_item, calibration) { action = act; }
+        if let Some(act) = render_button_calibration(ui, "Page 3", CalibrationItem::Page3Button, 
+            settings.page_3_pos, calibrating_item, calibration) { action = act; }
+        if let Some(act) = render_button_calibration(ui, "Page 4", CalibrationItem::Page4Button, 
+            settings.page_4_pos, calibrating_item, calibration) { action = act; }
+        if let Some(act) = render_button_calibration(ui, "Arrow Right", CalibrationItem::ArrowRightButton, 
+            settings.arrow_right_pos, calibrating_item, calibration) { action = act; }
+    });
+
+    ui.add_space(12.0);
+
+    // 3. Control
+    ui.vertical_centered(|ui| {
+        let (btn_text, btn_color) = if is_running {
+            ("Stop Filler", egui::Color32::from_rgb(255, 100, 100))
+        } else {
+            ("Start Filler", egui::Color32::from_rgb(100, 255, 100))
+        };
+        
+        let button = egui::Button::new(egui::RichText::new(btn_text).size(16.0).color(btn_color))
+            .min_size(egui::vec2(200.0, 35.0));
+        
+        if ui.add(button).clicked() {
+            action = if is_running {
+                UiAction::StopAutomation
+            } else {
+                UiAction::StartAutomation
+            };
         }
     });
-    
-    ui.horizontal(|ui| {
-        ui.label("Delay (ms):");
-        let mut delay = settings.delay_ms.to_string();
-        if ui.text_edit_singleline(&mut delay).changed() {
-            if let Ok(v) = delay.parse() { settings.delay_ms = v; }
-        }
-    });
 
-    ui.horizontal(|ui| {
-        ui.label("Red Dot Tolerance:");
-        ui.add(egui::Slider::new(&mut settings.red_dot_tolerance, 0.01..=0.99));
-    });
-
-    ui.add_space(10.0);
-
-    // Control
-    if !is_running {
-        if ui.button("Start").clicked() {
-            action = UiAction::StartAutomation;
-        }
-    } else {
-        if ui.button("Stop").clicked() {
-            action = UiAction::StopAutomation;
-        }
-    }
-
+    ui.add_space(12.0);
     ui.separator();
-    ui.heading("Status");
-    ui.label(status);
+    ui.add_space(6.0);
+
+    // 4. Status
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Status:").strong());
+        
+        let status_color = if status.contains("Running") || status.contains("Active") {
+            egui::Color32::from_rgb(100, 255, 100)
+        } else if status.contains("Error") || status.contains("Failed") {
+            egui::Color32::from_rgb(255, 100, 100)
+        } else {
+            egui::Color32::GRAY
+        };
+        
+        ui.label(egui::RichText::new(status).color(status_color));
+    });
     
     action
 }
@@ -148,30 +187,30 @@ fn render_area_calibration(
         
         if let Some((left, top, width, height)) = current {
             ui.label(egui::RichText::new(format!("({}, {}, {}x{})", left, top, width, height))
-                .color(egui::Color32::LIGHT_GREEN)
-                .small());
+                .monospace()
+                .strong());
         } else {
             ui.label(egui::RichText::new("Not set")
-                .color(egui::Color32::GRAY)
-                .small());
+                .color(egui::Color32::from_rgb(150, 150, 150))
+                .italics());
         }
 
         let is_this_calibrating = calibrating_item.as_ref() == Some(&item);
         
         if is_this_calibrating {
-            if ui.button("Cancel").clicked() {
+            if ui.button(egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
                 action = Some(UiAction::CancelCalibration);
             }
             if calibration.is_waiting_for_second_click() {
-                ui.label("Click BOTTOM-RIGHT");
+                ui.label(egui::RichText::new("Click BOTTOM-RIGHT").color(egui::Color32::YELLOW));
             } else {
-                ui.label("Click TOP-LEFT");
+                ui.label(egui::RichText::new("Click TOP-LEFT").color(egui::Color32::YELLOW));
             }
         } else {
             if ui.button("Set").clicked() {
                 action = Some(UiAction::StartCalibration(item.clone(), true));
             }
-            if current.is_some() && ui.button("Clear").clicked() {
+            if current.is_some() && ui.button("Clear").on_hover_text("Clear").clicked() {
                 action = Some(UiAction::ClearCalibration(item));
             }
         }
@@ -193,26 +232,26 @@ fn render_button_calibration(
         
         if let Some((x, y)) = current {
             ui.label(egui::RichText::new(format!("({}, {})", x, y))
-                .color(egui::Color32::LIGHT_GREEN)
-                .small());
+                .monospace()
+                .strong());
         } else {
             ui.label(egui::RichText::new("Not set")
-                .color(egui::Color32::GRAY)
-                .small());
+                .color(egui::Color32::from_rgb(150, 150, 150))
+                .italics());
         }
 
         let is_this_calibrating = calibrating_item.as_ref() == Some(&item);
 
         if is_this_calibrating {
-            if ui.button("Cancel").clicked() {
+            if ui.button(egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
                 action = Some(UiAction::CancelCalibration);
             }
-            ui.label("Click Button");
+            ui.label(egui::RichText::new("Click Button...").color(egui::Color32::YELLOW));
         } else {
             if ui.button("Set").clicked() {
                 action = Some(UiAction::StartCalibration(item.clone(), false));
             }
-            if current.is_some() && ui.button("Clear").clicked() {
+            if current.is_some() && ui.button("Clear").on_hover_text("Clear").clicked() {
                 action = Some(UiAction::ClearCalibration(item));
             }
         }
