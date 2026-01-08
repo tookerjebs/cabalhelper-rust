@@ -29,7 +29,7 @@ pub fn render_ui(
         return CustomMacroUiAction::None;
     }
 
-    // Name editing field, delete button, and add action buttons in one section
+    // Name editing field and delete button
     ui.horizontal(|ui| {
         ui.label("Name:");
         ui.text_edit_singleline(&mut named_macro.name);
@@ -40,10 +40,10 @@ pub fn render_ui(
                 action = CustomMacroUiAction::DeleteMacro;
             }
         }
-        
-        ui.separator();
-        
-        // Add action buttons
+    });
+    
+    // Add action buttons on a new line
+    ui.horizontal(|ui| {
         if ui.button("+ Click").clicked() {
             named_macro.settings.actions.push(MacroAction::Click {
                 coordinate: None,
