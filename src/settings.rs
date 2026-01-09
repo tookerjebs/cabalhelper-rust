@@ -10,6 +10,9 @@ pub struct AppSettings {
     pub accept_item: AcceptItemSettings,
     
     #[serde(default)]
+    pub ocr_macros: Vec<NamedOcrMacro>,
+    
+    #[serde(default)]
     pub custom_macros: Vec<NamedMacro>,
 }
 
@@ -18,6 +21,7 @@ impl Default for AppSettings {
         Self {
             collection_filler: CollectionFillerSettings::default(),
             accept_item: AcceptItemSettings::default(),
+            ocr_macros: vec![NamedOcrMacro::default()],
             custom_macros: vec![NamedMacro::default()],
         }
     }
@@ -111,6 +115,90 @@ impl Default for AcceptItemSettings {
         }
     }
 }
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
+pub enum ComparisonMode {
+    Equals,
+    GreaterThanOrEqual,
+    LessThanOrEqual,
+}
+
+impl Default for ComparisonMode {
+    fn default() -> Self {
+        ComparisonMode::Equals
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OcrMacroSettings {
+    // OCR Configuration
+    pub ocr_region: Option<(i32, i32, i32, i32)>,
+    #[serde(default = "default_scale_factor")]
+    pub scale_factor: u32,
+    #[serde(default)]
+    pub invert_colors: bool,
+    #[serde(default = "default_true")]
+    pub grayscale: bool,
+    
+    // Target Configuration
+    #[serde(default)]
+    pub target_stat: String,
+    #[serde(default)]
+    pub target_value: i32,
+    #[serde(default)]
+    pub comparison: ComparisonMode,
+    
+    // Reroll Actions (Sequence)
+    #[serde(default)]
+    pub reroll_actions: Vec<MacroAction>,
+    #[serde(default = "default_interval")]
+    pub interval_ms: u64,
+}
+
+fn default_scale_factor() -> u32 { 2 }
+fn default_true() -> bool { true }
+fn default_interval() -> u64 { 500 }
+
+impl Default for OcrMacroSettings {
+    fn default() -> Self {
+        Self {
+            ocr_region: None,
+            scale_factor: 2,
+            invert_colors: false,
+            grayscale: true,
+            target_stat: String::new(),
+            target_value: 0,
+            comparison: ComparisonMode::default(),
+            reroll_actions: Vec::new(),
+            interval_ms: 500,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NamedOcrMacro {
+    pub name: String,
+    pub settings: OcrMacroSettings,
+}
+
+impl NamedOcrMacro {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            settings: OcrMacroSettings::default(),
+        }
+    }
+}
+
+impl Default for NamedOcrMacro {
+    fn default() -> Self {
+        Self::new("My OCR Macro".to_string())
+    }
+}
+
+pub const MAX_OCR_MACROS: usize = 20;
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NamedMacro {

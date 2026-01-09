@@ -1,9 +1,9 @@
 use windows::{
     Win32::Foundation::{HWND, LPARAM, WPARAM},
     Win32::UI::WindowsAndMessaging::{
-        SendMessageA, WM_LBUTTONDOWN, WM_LBUTTONUP,
+        SendMessageA, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_KEYDOWN, WM_KEYUP,
     },
-    Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState,
+    Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VIRTUAL_KEY},
 };
 
 // MK_LBUTTON constant value
@@ -53,5 +53,14 @@ pub fn is_escape_key_down() -> bool {
     unsafe {
         let key_state = GetAsyncKeyState(0x1B); // VK_ESCAPE
         (key_state as u16) & 0x8000 != 0
+    }
+}
+
+/// Send a key press to the window (WM_KEYDOWN and WM_KEYUP)
+pub fn send_key_to_window(hwnd: HWND, key_code: u16) -> bool {
+    unsafe {
+        SendMessageA(hwnd, WM_KEYDOWN, WPARAM(key_code as usize), LPARAM(0));
+        SendMessageA(hwnd, WM_KEYUP, WPARAM(key_code as usize), LPARAM(0));
+        true
     }
 }
