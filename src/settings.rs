@@ -140,6 +140,10 @@ pub struct OcrMacroSettings {
     pub invert_colors: bool,
     #[serde(default = "default_true")]
     pub grayscale: bool,
+    #[serde(default)]
+    pub decode_mode: OcrDecodeMode,
+    #[serde(default = "default_beam_width")]
+    pub beam_width: u32,
     
     // Target Configuration
     #[serde(default)]
@@ -159,6 +163,7 @@ pub struct OcrMacroSettings {
 fn default_scale_factor() -> u32 { 2 }
 fn default_true() -> bool { true }
 fn default_interval() -> u64 { 500 }
+fn default_beam_width() -> u32 { 10 }
 
 impl Default for OcrMacroSettings {
     fn default() -> Self {
@@ -167,6 +172,8 @@ impl Default for OcrMacroSettings {
             scale_factor: 2,
             invert_colors: false,
             grayscale: true,
+            decode_mode: OcrDecodeMode::default(),
+            beam_width: default_beam_width(),
             target_stat: String::new(),
             target_value: 0,
             comparison: ComparisonMode::default(),
@@ -198,6 +205,18 @@ impl Default for NamedOcrMacro {
 }
 
 pub const MAX_OCR_MACROS: usize = 20;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
+pub enum OcrDecodeMode {
+    Greedy,
+    BeamSearch,
+}
+
+impl Default for OcrDecodeMode {
+    fn default() -> Self {
+        OcrDecodeMode::Greedy
+    }
+}
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

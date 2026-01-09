@@ -1,5 +1,5 @@
 use eframe::egui;
-use crate::settings::{OcrMacroSettings, ComparisonMode, MacroAction, MouseButton};
+use crate::settings::{OcrMacroSettings, ComparisonMode, MacroAction, MouseButton, OcrDecodeMode};
 
 #[derive(Debug)]
 pub enum OcrMacroUiAction {
@@ -84,6 +84,30 @@ pub fn render_ui(
                 
                 ui.checkbox(&mut settings.invert_colors, "Invert Colors");
                 ui.checkbox(&mut settings.grayscale, "Grayscale");
+            });
+
+            ui.add_space(4.0);
+
+            // Decode method settings
+            ui.horizontal(|ui| {
+                ui.label("Decode:");
+                egui::ComboBox::from_id_source("decode_mode")
+                    .selected_text(match settings.decode_mode {
+                        OcrDecodeMode::Greedy => "Greedy (fast)",
+                        OcrDecodeMode::BeamSearch => "Beam Search",
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut settings.decode_mode, OcrDecodeMode::Greedy, "Greedy (fast)");
+                        ui.selectable_value(&mut settings.decode_mode, OcrDecodeMode::BeamSearch, "Beam Search (more accurate)");
+                    });
+
+                if matches!(settings.decode_mode, OcrDecodeMode::BeamSearch) {
+                    ui.label("Beam width:");
+                    ui.add(
+                        egui::DragValue::new(&mut settings.beam_width)
+                            .clamp_range(2..=64)
+                    );
+                }
             });
         });
     });

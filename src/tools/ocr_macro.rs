@@ -1,6 +1,6 @@
 use eframe::egui;
 use windows::Win32::Foundation::HWND;
-use crate::settings::{OcrMacroSettings, MacroAction};
+use crate::settings::{OcrMacroSettings, MacroAction, OcrDecodeMode};
 use crate::tools::r#trait::Tool;
 use crate::calibration::{CalibrationManager, CalibrationResult};
 use crate::core::worker::Worker;
@@ -9,6 +9,7 @@ use crate::core::ocr_parser::{parse_ocr_result, matches_target};
 use crate::ui::ocr_macro::{OcrMacroUiAction, render_ui};
 use std::sync::{Arc, Mutex};
 use crate::automation::interaction::delay_ms;
+use ocrs::DecodeMethod;
 
 // Embed the OCR models directly into the binary
 const DETECTION_MODEL_BYTES: &[u8] = include_bytes!("../models/text-detection.rten");
@@ -236,10 +237,20 @@ impl OcrMacroTool {
                 }
             };
             
+            // Select decode method (greedy vs beam search)
+            let decode_method = match settings.decode_mode {
+                OcrDecodeMode::Greedy => DecodeMethod::Greedy,
+                OcrDecodeMode::BeamSearch => {
+                    let width = settings.beam_width.max(2);
+                    DecodeMethod::BeamSearch { width }
+                }
+            };
+
             // Initialize OCR engine
             let ocr_engine = match ocrs::OcrEngine::new(ocrs::OcrEngineParams {
                 detection_model: Some(detection_model),
                 recognition_model: Some(recognition_model),
+                decode_method,
                 ..Default::default()
             }) {
                 Ok(engine) => engine,
