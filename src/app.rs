@@ -2,10 +2,9 @@ use eframe::egui;
 use crate::tools::image_clicker::ImageClickerTool;
 use crate::tools::collection_filler::CollectionFillerTool;
 use crate::tools::custom_macro::CustomMacroTool;
-use crate::tools::ocr_macro::OcrMacroTool;
 use crate::tools::r#trait::Tool;
 use crate::core::window::is_window_valid;
-use crate::settings::{AppSettings, NamedMacro, NamedOcrMacro, MAX_CUSTOM_MACROS, MAX_OCR_MACROS};
+use crate::settings::{AppSettings, NamedMacro, MAX_CUSTOM_MACROS};
 use windows::Win32::Foundation::HWND;
 
 // Macro to toggle a tool with mutual exclusion
@@ -74,13 +73,7 @@ impl CabalHelperApp {
         tools.push(Box::new(CollectionFillerTool::default()));
         names.push("Collection Filler".to_string());
         
-        // Dynamic OCR macros
-        for (idx, named_ocr) in settings.ocr_macros.iter().enumerate() {
-            tools.push(Box::new(OcrMacroTool::new(idx)));
-            names.push(named_ocr.name.clone());
-        }
-
-        // Dynamic custom macro tools
+        // Dynamic custom macro tools (single universal macro type)
         for (idx, named_macro) in settings.custom_macros.iter().enumerate() {
             tools.push(Box::new(CustomMacroTool::new(idx)));
             names.push(named_macro.name.clone());
@@ -260,17 +253,6 @@ impl eframe::App for CabalHelperApp {
                         }
                     }
                     
-                    // Add "+ New OCR" button
-                    if self.settings.ocr_macros.len() < MAX_OCR_MACROS {
-                        if ui.button("+ New OCR").clicked() {
-                            let new_name = format!("OCR {}", self.settings.ocr_macros.len() + 1);
-                            self.settings.ocr_macros.push(NamedOcrMacro::new(new_name.clone()));
-                            self.rebuild_tools();
-                            self.selected_tab = new_name;
-                            self.settings.auto_save();
-                        }
-                    }
-                    
                     // Add "+ New Macro" button (only if under max limit)
                     if self.settings.custom_macros.len() < MAX_CUSTOM_MACROS {
                         if ui.button("+ New Macro").clicked() {
@@ -296,8 +278,8 @@ impl eframe::App for CabalHelperApp {
                 
                 // Check if macro count changed (e.g., macro was deleted)
                 // We need to rebuild tools to stay in sync
-                // 2 hardcoded (Image Clicker, Collection Filler) + N OCR macros + N Custom macros
-                let expected_tool_count = 2 + self.settings.ocr_macros.len() + self.settings.custom_macros.len();
+                // 2 hardcoded (Image Clicker, Collection Filler) + N Custom macros
+                let expected_tool_count = 2 + self.settings.custom_macros.len();
                 if self.tools.len() != expected_tool_count {
                     self.rebuild_tools();
                 }

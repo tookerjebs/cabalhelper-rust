@@ -8,10 +8,7 @@ pub struct AppSettings {
     
     #[serde(default)]
     pub accept_item: AcceptItemSettings,
-    
-    #[serde(default)]
-    pub ocr_macros: Vec<NamedOcrMacro>,
-    
+
     #[serde(default)]
     pub custom_macros: Vec<NamedMacro>,
 }
@@ -21,7 +18,6 @@ impl Default for AppSettings {
         Self {
             collection_filler: CollectionFillerSettings::default(),
             accept_item: AcceptItemSettings::default(),
-            ocr_macros: vec![NamedOcrMacro::default()],
             custom_macros: vec![NamedMacro::default()],
         }
     }
