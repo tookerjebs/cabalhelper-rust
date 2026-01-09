@@ -1,5 +1,5 @@
 use eframe::egui;
-use crate::settings::{OcrMacroSettings, ComparisonMode, MacroAction, MouseButton, OcrDecodeMode};
+use crate::settings::{OcrMacroSettings, ComparisonMode, MacroAction, MouseButton, OcrDecodeMode, OcrNameMatchMode};
 
 #[derive(Debug)]
 pub enum OcrMacroUiAction {
@@ -141,6 +141,19 @@ pub fn render_ui(
             
             ui.add(egui::DragValue::new(&mut settings.target_value));
         });
+
+        ui.horizontal(|ui| {
+            ui.label("Name match:");
+            egui::ComboBox::from_id_source("ocr_name_match_mode")
+                .selected_text(match settings.name_match_mode {
+                    OcrNameMatchMode::Exact => "Exact name",
+                    OcrNameMatchMode::Contains => "Contains text",
+                })
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut settings.name_match_mode, OcrNameMatchMode::Exact, "Exact name");
+                    ui.selectable_value(&mut settings.name_match_mode, OcrNameMatchMode::Contains, "Contains text");
+                });
+        });
     });
 
     ui.add_space(8.0);
@@ -203,6 +216,7 @@ pub fn render_ui(
                                         MacroAction::Click { .. } => "Click",
                                         MacroAction::TypeText { .. } => "Type",
                                         MacroAction::Delay { .. } => "Delay",
+                                        MacroAction::OcrSearch { .. } => "OCR Search (unused here)",
                                     };
                                     ui.label(egui::RichText::new(format!("{}. {}", idx + 1, title)).strong());
                                     
@@ -251,6 +265,9 @@ pub fn render_ui(
                                             ui.label("ms:");
                                             ui.add(egui::DragValue::new(milliseconds));
                                         });
+                                    }
+                                    MacroAction::OcrSearch { .. } => {
+                                        ui.label(egui::RichText::new("OCR Search actions are not supported in this sequence").italics());
                                     }
                                 }
                             });

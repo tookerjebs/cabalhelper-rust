@@ -144,6 +144,8 @@ pub struct OcrMacroSettings {
     pub decode_mode: OcrDecodeMode,
     #[serde(default = "default_beam_width")]
     pub beam_width: u32,
+    #[serde(default)]
+    pub name_match_mode: OcrNameMatchMode,
     
     // Target Configuration
     #[serde(default)]
@@ -174,6 +176,7 @@ impl Default for OcrMacroSettings {
             grayscale: true,
             decode_mode: OcrDecodeMode::default(),
             beam_width: default_beam_width(),
+            name_match_mode: OcrNameMatchMode::default(),
             target_stat: String::new(),
             target_value: 0,
             comparison: ComparisonMode::default(),
@@ -218,6 +221,18 @@ impl Default for OcrDecodeMode {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
+pub enum OcrNameMatchMode {
+    Exact,
+    Contains,
+}
+
+impl Default for OcrNameMatchMode {
+    fn default() -> Self {
+        OcrNameMatchMode::Exact
+    }
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NamedMacro {
@@ -254,6 +269,27 @@ pub enum MacroAction {
     },
     Delay {
         milliseconds: u64,
+    },
+    OcrSearch {
+        ocr_region: Option<(i32, i32, i32, i32)>,
+        #[serde(default = "default_scale_factor")]
+        scale_factor: u32,
+        #[serde(default)]
+        invert_colors: bool,
+        #[serde(default = "default_true")]
+        grayscale: bool,
+        #[serde(default)]
+        decode_mode: OcrDecodeMode,
+        #[serde(default = "default_beam_width")]
+        beam_width: u32,
+        #[serde(default)]
+        target_stat: String,
+        #[serde(default)]
+        target_value: i32,
+        #[serde(default)]
+        comparison: ComparisonMode,
+        #[serde(default)]
+        name_match_mode: OcrNameMatchMode,
     },
 }
 

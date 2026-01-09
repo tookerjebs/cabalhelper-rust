@@ -1,6 +1,6 @@
 use eframe::egui;
 use windows::Win32::Foundation::HWND;
-use crate::settings::{OcrMacroSettings, MacroAction, OcrDecodeMode};
+use crate::settings::{OcrMacroSettings, MacroAction, OcrDecodeMode, OcrNameMatchMode, ComparisonMode};
 use crate::tools::r#trait::Tool;
 use crate::calibration::{CalibrationManager, CalibrationResult};
 use crate::core::worker::Worker;
@@ -294,6 +294,9 @@ impl OcrMacroTool {
                         MacroAction::Delay { milliseconds } => {
                             delay_ms(*milliseconds);
                         },
+                        MacroAction::OcrSearch { .. } => {
+                            // Not used in OCR macro reroll actions
+                        },
                     }
                 }
                 
@@ -348,7 +351,34 @@ impl OcrMacroTool {
                                     *ocr_result.lock().unwrap() = text.clone();
                                     
                                     if let Some((detected_stat, detected_value)) = parse_ocr_result(&text) {
-                                        if matches_target(&detected_stat, detected_value, &settings.target_stat, settings.target_value, settings.comparison) {
+                                        let matched = match settings.name_match_mode {
+                                            OcrNameMatchMode::Exact => {
+                                                matches_target(
+                                                    &detected_stat,
+                                                    detected_value,
+                                                    &settings.target_stat,
+                                                    settings.target_value,
+                                                    settings.comparison,
+                                                )
+                                            }
+                                            OcrNameMatchMode::Contains => {
+                                                let detected = detected_stat.to_lowercase();
+                                                let target = settings.target_stat.to_lowercase().trim().to_string();
+                                                if target.is_empty() {
+                                                    false
+                                                } else if !detected.contains(&target) {
+                                                    false
+                                                } else {
+                                                    match settings.comparison {
+                                                        ComparisonMode::Equals => detected_value == settings.target_value,
+                                                        ComparisonMode::GreaterThanOrEqual => detected_value >= settings.target_value,
+                                                        ComparisonMode::LessThanOrEqual => detected_value <= settings.target_value,
+                                                    }
+                                                }
+                                            }
+                                        };
+
+                                        if matched {
                                             *match_found.lock().unwrap() = true;
                                             *status.lock().unwrap() = format!("MATCH FOUND! {} {}", detected_stat, detected_value);
                                             *running.lock().unwrap() = false;

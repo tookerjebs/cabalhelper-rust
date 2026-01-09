@@ -1,10 +1,12 @@
 use eframe::egui;
-use crate::settings::{MacroAction, MouseButton, NamedMacro};
+use crate::settings::{MacroAction, MouseButton, NamedMacro, OcrDecodeMode, OcrNameMatchMode, ComparisonMode};
 
 #[derive(Debug)]
 pub enum CustomMacroUiAction {
-    StartCalibration(usize), // action index
+    StartCalibration(usize), // Click action index
     CancelCalibration,
+    StartOcrRegionCalibration(usize), // OCR action index
+    CancelOcrRegionCalibration,
     StartMacro,
     StopMacro,
     DeleteMacro,
@@ -15,8 +17,8 @@ pub enum CustomMacroUiAction {
 pub fn render_ui(
     ui: &mut egui::Ui,
     named_macro: &mut NamedMacro,
-    _is_calibrating: bool,
-    calibrating_action_index: Option<usize>,
+    click_calibrating_action_index: Option<usize>,
+    ocr_calibrating_action_index: Option<usize>,
     is_running: bool,
     status: &str,
     game_connected: bool,
@@ -64,6 +66,20 @@ pub fn render_ui(
             if ui.button("Delay").clicked() {
                 named_macro.settings.actions.push(MacroAction::Delay {
                     milliseconds: 100,
+                });
+            }
+            if ui.button("OCR Search").clicked() {
+                named_macro.settings.actions.push(MacroAction::OcrSearch {
+                    ocr_region: None,
+                    scale_factor: 2,
+                    invert_colors: false,
+                    grayscale: true,
+                    decode_mode: OcrDecodeMode::Greedy,
+                    beam_width: 10,
+                    target_stat: String::new(),
+                    target_value: 0,
+                    comparison: ComparisonMode::Equals,
+                    name_match_mode: OcrNameMatchMode::Exact,
                 });
             }
         });
@@ -116,6 +132,7 @@ pub fn render_ui(
                                 MacroAction::Click { .. } => "Click",
                                 MacroAction::TypeText { .. } => "Type Text",
                                 MacroAction::Delay { .. } => "Delay",
+                                MacroAction::OcrSearch { .. } => "OCR Search",
                             };
                             
                             ui.label(egui::RichText::new(format!("{}. {}", idx + 1, title)).strong().size(14.0));
@@ -140,7 +157,7 @@ pub fn render_ui(
                                         ui.colored_label(egui::Color32::from_rgb(255, 100, 100), "Not set");
                                     }
                                     
-                                    let is_this_calibrating = calibrating_action_index == Some(idx);
+                                    let is_this_calibrating = click_calibrating_action_index == Some(idx);
                                     if is_this_calibrating {
                                         if ui.button(egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
                                             action = CustomMacroUiAction::CancelCalibration;
@@ -189,6 +206,128 @@ pub fn render_ui(
                                             *milliseconds = val;
                                         }
                                     }
+                                });
+                            },
+                            MacroAction::OcrSearch {
+                                ocr_region,
+                                scale_factor,
+                                invert_colors,
+                                grayscale,
+                                decode_mode,
+                                beam_width,
+                                target_stat,
+                                target_value,
+                                comparison,
+                                name_match_mode,
+                            } => {
+                                ui.group(|ui| {
+                                    ui.horizontal(|ui| {
+                                        ui.label("Region:");
+                                        if let Some((l, t, w, h)) = ocr_region {
+                                            ui.monospace(format!("({}, {}, {}x{})", l, t, w, h));
+                                        } else {
+                                            ui.colored_label(egui::Color32::from_rgb(255, 200, 100), "Not set");
+                                        }
+
+                                        let is_this_ocr_calibrating = ocr_calibrating_action_index == Some(idx);
+                                        if is_this_ocr_calibrating {
+                                            if ui.button(egui::RichText::new("Stop").color(egui::Color32::RED)).clicked() {
+                                                action = CustomMacroUiAction::CancelOcrRegionCalibration;
+                                            }
+                                            ui.label(egui::RichText::new("Click TOP-LEFT, then BOTTOM-RIGHT").color(egui::Color32::YELLOW));
+                                        } else {
+                                            if ui.button("Set Region").clicked() {
+                                                action = CustomMacroUiAction::StartOcrRegionCalibration(idx);
+                                            }
+                                            if ocr_region.is_some() && ui.button("Clear").clicked() {
+                                                *ocr_region = None;
+                                            }
+                                        }
+                                    });
+
+                                    ui.add_space(4.0);
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Scale:");
+                                        egui::ComboBox::from_id_source(format!("ocr_scale_{}", idx))
+                                            .selected_text(format!("{}x", *scale_factor))
+                                            .show_ui(ui, |ui| {
+                                                ui.selectable_value(scale_factor, 1, "1x");
+                                                ui.selectable_value(scale_factor, 2, "2x");
+                                                ui.selectable_value(scale_factor, 3, "3x");
+                                                ui.selectable_value(scale_factor, 4, "4x");
+                                            });
+
+                                        ui.checkbox(invert_colors, "Invert");
+                                        ui.checkbox(grayscale, "Grayscale");
+                                    });
+
+                                    ui.add_space(4.0);
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Decode:");
+                                        egui::ComboBox::from_id_source(format!("ocr_decode_mode_{}", idx))
+                                            .selected_text(match decode_mode {
+                                                OcrDecodeMode::Greedy => "Greedy (fast)",
+                                                OcrDecodeMode::BeamSearch => "Beam Search",
+                                            })
+                                            .show_ui(ui, |ui| {
+                                                ui.selectable_value(decode_mode, OcrDecodeMode::Greedy, "Greedy (fast)");
+                                                ui.selectable_value(decode_mode, OcrDecodeMode::BeamSearch, "Beam Search");
+                                            });
+
+                                        if matches!(decode_mode, OcrDecodeMode::BeamSearch) {
+                                            ui.label("Beam width:");
+                                            ui.add(
+                                                egui::DragValue::new(beam_width)
+                                                    .clamp_range(2..=64)
+                                            );
+                                        }
+                                    });
+
+                                    ui.add_space(4.0);
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Stat:");
+                                        ui.text_edit_singleline(target_stat);
+                                        ui.label("Value:");
+                                        let mut val_str = target_value.to_string();
+                                        if ui.text_edit_singleline(&mut val_str).changed() {
+                                            if let Ok(v) = val_str.parse() {
+                                                *target_value = v;
+                                            }
+                                        }
+                                    });
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Compare:");
+                                        egui::ComboBox::from_id_source(format!("ocr_cmp_{}", idx))
+                                            .selected_text(match comparison {
+                                                ComparisonMode::Equals => "Equal (==)",
+                                                ComparisonMode::GreaterThanOrEqual => "≥",
+                                                ComparisonMode::LessThanOrEqual => "≤",
+                                            })
+                                            .show_ui(ui, |ui| {
+                                                ui.selectable_value(comparison, ComparisonMode::Equals, "Equal (==)");
+                                                ui.selectable_value(comparison, ComparisonMode::GreaterThanOrEqual, "≥");
+                                                ui.selectable_value(comparison, ComparisonMode::LessThanOrEqual, "≤");
+                                            });
+                                    });
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Name match:");
+                                        egui::ComboBox::from_id_source(format!("ocr_name_match_{}", idx))
+                                            .selected_text(match name_match_mode {
+                                                OcrNameMatchMode::Exact => "Exact name",
+                                                OcrNameMatchMode::Contains => "Contains text",
+                                            })
+                                            .show_ui(ui, |ui| {
+                                                ui.selectable_value(name_match_mode, OcrNameMatchMode::Exact, "Exact name");
+                                                ui.selectable_value(name_match_mode, OcrNameMatchMode::Contains, "Contains text");
+                                            });
+                                    });
+
+                                    ui.label(egui::RichText::new("If match is found, macro stops.").size(11.0).italics());
                                 });
                             },
                         }
