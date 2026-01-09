@@ -1,9 +1,9 @@
 use windows::{
     Win32::Foundation::{HWND, LPARAM, WPARAM},
     Win32::UI::WindowsAndMessaging::{
-        SendMessageA, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_KEYDOWN, WM_KEYUP,
+        SendMessageA, WM_LBUTTONDOWN, WM_LBUTTONUP,
     },
-    Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VIRTUAL_KEY},
+    Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState,
 };
 
 // MK_LBUTTON constant value
@@ -48,19 +48,18 @@ pub fn is_left_mouse_down() -> bool {
     }
 }
 
+/// Check if left mouse button was pressed since last call
+pub fn was_left_mouse_pressed() -> bool {
+    unsafe {
+        let key_state = GetAsyncKeyState(0x01); // VK_LBUTTON
+        (key_state as u16) & 0x0001 != 0
+    }
+}
+
 /// Check if ESC key is currently down (works even when app doesn't have focus)
 pub fn is_escape_key_down() -> bool {
     unsafe {
         let key_state = GetAsyncKeyState(0x1B); // VK_ESCAPE
         (key_state as u16) & 0x8000 != 0
-    }
-}
-
-/// Send a key press to the window (WM_KEYDOWN and WM_KEYUP)
-pub fn send_key_to_window(hwnd: HWND, key_code: u16) -> bool {
-    unsafe {
-        SendMessageA(hwnd, WM_KEYDOWN, WPARAM(key_code as usize), LPARAM(0));
-        SendMessageA(hwnd, WM_KEYUP, WPARAM(key_code as usize), LPARAM(0));
-        true
     }
 }

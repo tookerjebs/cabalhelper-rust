@@ -5,7 +5,7 @@ use std::fs;
 pub struct AppSettings {
     #[serde(default)]
     pub collection_filler: CollectionFillerSettings,
-    
+
     #[serde(default)]
     pub accept_item: AcceptItemSettings,
 
@@ -29,7 +29,7 @@ pub struct CollectionFillerSettings {
     pub collection_tabs_area: Option<(i32, i32, i32, i32)>,
     pub dungeon_list_area: Option<(i32, i32, i32, i32)>,
     pub collection_items_area: Option<(i32, i32, i32, i32)>,
-    
+
     // Button Coordinates (x, y relative to game window)
     pub auto_refill_pos: Option<(i32, i32)>,
     pub register_pos: Option<(i32, i32)>,
@@ -38,18 +38,18 @@ pub struct CollectionFillerSettings {
     pub page_3_pos: Option<(i32, i32)>,
     pub page_4_pos: Option<(i32, i32)>,
     pub arrow_right_pos: Option<(i32, i32)>,
-    
+
     // Speed and matching settings
     pub delay_ms: u64,
     #[serde(default = "default_red_dot_tolerance")]
     pub red_dot_tolerance: f32,
-    
+
     // Color filtering settings (to distinguish red dots from grey dots)
     #[serde(default = "default_min_red")]
     pub min_red: u8,
     #[serde(default = "default_red_dominance")]
     pub red_dominance: u8,
-    
+
     // Red dot image path
     #[serde(default = "default_red_dot_path")]
     pub red_dot_path: String,
@@ -106,7 +106,7 @@ impl Default for AcceptItemSettings {
         Self {
             image_path: "image.png".to_string(),
             interval_ms: 100,  // Reduced from 1000ms for faster detection
-            tolerance: 0.85, 
+            tolerance: 0.85,
             search_region: None,
         }
     }
@@ -126,84 +126,9 @@ impl Default for ComparisonMode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OcrMacroSettings {
-    // OCR Configuration
-    pub ocr_region: Option<(i32, i32, i32, i32)>,
-    #[serde(default = "default_scale_factor")]
-    pub scale_factor: u32,
-    #[serde(default)]
-    pub invert_colors: bool,
-    #[serde(default = "default_true")]
-    pub grayscale: bool,
-    #[serde(default)]
-    pub decode_mode: OcrDecodeMode,
-    #[serde(default = "default_beam_width")]
-    pub beam_width: u32,
-    #[serde(default)]
-    pub name_match_mode: OcrNameMatchMode,
-    
-    // Target Configuration
-    #[serde(default)]
-    pub target_stat: String,
-    #[serde(default)]
-    pub target_value: i32,
-    #[serde(default)]
-    pub comparison: ComparisonMode,
-    
-    // Reroll Actions (Sequence)
-    #[serde(default)]
-    pub reroll_actions: Vec<MacroAction>,
-    #[serde(default = "default_interval")]
-    pub interval_ms: u64,
-}
-
 fn default_scale_factor() -> u32 { 2 }
 fn default_true() -> bool { true }
-fn default_interval() -> u64 { 500 }
 fn default_beam_width() -> u32 { 10 }
-
-impl Default for OcrMacroSettings {
-    fn default() -> Self {
-        Self {
-            ocr_region: None,
-            scale_factor: 2,
-            invert_colors: false,
-            grayscale: true,
-            decode_mode: OcrDecodeMode::default(),
-            beam_width: default_beam_width(),
-            name_match_mode: OcrNameMatchMode::default(),
-            target_stat: String::new(),
-            target_value: 0,
-            comparison: ComparisonMode::default(),
-            reroll_actions: Vec::new(),
-            interval_ms: 500,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NamedOcrMacro {
-    pub name: String,
-    pub settings: OcrMacroSettings,
-}
-
-impl NamedOcrMacro {
-    pub fn new(name: String) -> Self {
-        Self {
-            name,
-            settings: OcrMacroSettings::default(),
-        }
-    }
-}
-
-impl Default for NamedOcrMacro {
-    fn default() -> Self {
-        Self::new("My OCR Macro".to_string())
-    }
-}
-
-pub const MAX_OCR_MACROS: usize = 20;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
 pub enum OcrDecodeMode {
@@ -338,7 +263,7 @@ pub const MAX_CUSTOM_MACROS: usize = 10;
 
 impl AppSettings {
     const SETTINGS_FILE: &'static str = "cabalhelper_settings.json";
-    
+
     /// Load settings from file, or create default if doesn't exist
     pub fn load() -> Self {
         match fs::read_to_string(Self::SETTINGS_FILE) {
@@ -361,18 +286,18 @@ impl AppSettings {
             }
         }
     }
-    
+
     /// Save settings to file (auto-save)
     pub fn save(&self) -> Result<(), String> {
         let json = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize: {}", e))?;
-        
+
         fs::write(Self::SETTINGS_FILE, json)
             .map_err(|e| format!("Failed to write file: {}", e))?;
-        
+
         Ok(())
     }
-    
+
     /// Auto-save (ignores errors)
     pub fn auto_save(&self) {
         let _ = self.save();

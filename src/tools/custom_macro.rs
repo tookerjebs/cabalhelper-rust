@@ -11,10 +11,10 @@ use crate::core::worker::Worker;
 pub struct CustomMacroTool {
     // Which macro profile this tool is managing
     macro_index: usize,
-    
+
     // Runtime state (Generic Worker)
     worker: Worker,
-    
+
     // Calibration
     calibration: CalibrationManager,
     calibrating_action_index: Option<usize>,
@@ -54,9 +54,9 @@ impl Tool for CustomMacroTool {
             self.worker.set_status("Macro profile not found");
             return;
         }
-        
+
         let settings = &app_settings.custom_macros[self.macro_index].settings;
-        
+
         if let Some(hwnd) = game_hwnd {
             if !settings.actions.is_empty() {
                 self.start_macro(settings.clone(), hwnd);
@@ -73,13 +73,13 @@ impl Tool for CustomMacroTool {
             ui.colored_label(egui::Color32::RED, "Error: Macro profile not found");
             return;
         }
-        
+
         // Can delete this macro if there's more than 1 total
         // Calculate this BEFORE taking mutable borrow
         let can_delete = settings.custom_macros.len() > 1;
-        
+
         let macro_settings = &mut settings.custom_macros[self.macro_index];
-        
+
         // Handle calibration interaction
         if let Some(hwnd) = game_hwnd {
             if let Some(result) = self.calibration.update(hwnd) {
@@ -121,12 +121,12 @@ impl Tool for CustomMacroTool {
         let ocr_calibrating_index = self.ocr_calibrating_action_index;
 
         let action = render_ui(
-            ui, 
+            ui,
             macro_settings,
             click_calibrating_index,
             ocr_calibrating_index,
-            is_running, 
-            &status, 
+            is_running,
+            &status,
             game_hwnd.is_some(),
             can_delete
         );
@@ -180,7 +180,7 @@ impl Tool for CustomMacroTool {
 impl CustomMacroTool {
     fn start_macro(&mut self, settings: CustomMacroSettings, game_hwnd: HWND) {
         self.worker.set_status("Running macro...");
-        
+
         // Use generic worker
         self.worker.start(move |running: Arc<Mutex<bool>>, status: Arc<Mutex<String>>| {
             use crate::core::input::click_at_position;
@@ -188,7 +188,7 @@ impl CustomMacroTool {
             use crate::core::screen_capture::capture_region;
             use crate::core::ocr_parser::{parse_ocr_result, matches_target};
             use ocrs::{OcrEngine, OcrEngineParams, ImageSource, DecodeMethod};
-            
+
             let mut ctx = match AutomationContext::new(game_hwnd) {
                 Ok(c) => c,
                 Err(e) => {
@@ -295,7 +295,7 @@ impl CustomMacroTool {
                         MacroAction::Click { coordinate, button: _, click_method, use_mouse_movement: _ } => {
                             if let Some((x, y)) = coordinate {
                                 *status.lock().unwrap() = format!("Clicking at ({}, {})", x, y);
-                                
+
                                 match click_method {
                                     crate::settings::ClickMethod::SendMessage => {
                                         // Direct click without mouse movement (default)
@@ -331,12 +331,11 @@ impl CustomMacroTool {
                             scale_factor,
                             invert_colors,
                             grayscale,
-                            decode_mode,
-                            beam_width,
                             target_stat,
                             target_value,
                             comparison,
                             name_match_mode,
+                            ..
                         } => {
                             if ocr_engine.is_none() {
                                 *status.lock().unwrap() = "OCR engine not initialized".to_string();
@@ -446,10 +445,10 @@ impl CustomMacroTool {
                         },
                     }
                 }
-                
+
                 iteration += 1;
             }
-            
+
             if *running.lock().unwrap() {
                 *status.lock().unwrap() = "Macro completed!".to_string();
             } else {

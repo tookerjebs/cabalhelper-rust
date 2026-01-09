@@ -1,6 +1,6 @@
 // Calibration module - shared calibration logic for all tools
 use windows::Win32::Foundation::HWND;
-use crate::core::input::is_left_mouse_down;
+use crate::core::input::was_left_mouse_pressed;
 use crate::core::window::{get_window_under_cursor, is_game_window_or_child, get_cursor_pos, screen_to_window_coords};
 
 /// Result of a calibration operation
@@ -15,7 +15,6 @@ pub struct CalibrationManager {
     active: bool,
     is_area: bool, // true for area calibration, false for point
     area_start: Option<(i32, i32)>,
-    last_mouse_state: bool,
 }
 
 impl Default for CalibrationManager {
@@ -24,7 +23,6 @@ impl Default for CalibrationManager {
             active: false,
             is_area: false,
             area_start: None,
-            last_mouse_state: false,
         }
     }
 }
@@ -33,39 +31,37 @@ impl CalibrationManager {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Start calibrating a point (single click)
     pub fn start_point(&mut self) {
         self.active = true;
         self.is_area = false;
         self.area_start = None;
-        self.last_mouse_state = false;
     }
-    
+
     /// Start calibrating an area (two clicks: top-left, bottom-right)
     pub fn start_area(&mut self) {
         self.active = true;
         self.is_area = true;
         self.area_start = None;
-        self.last_mouse_state = false;
     }
-    
+
     /// Cancel current calibration
     pub fn cancel(&mut self) {
         self.active = false;
         self.area_start = None;
     }
-    
+
     /// Check if calibration is active
     pub fn is_active(&self) -> bool {
         self.active
     }
-    
+
     /// Check if waiting for second click (area calibration only)
     pub fn is_waiting_for_second_click(&self) -> bool {
         self.is_area && self.area_start.is_some()
     }
-    
+
     /// Main update loop for calibration
     /// Handles mouse clicks and returns result if calibration finished this frame
     pub fn update(&mut self, game_hwnd: HWND) -> Option<CalibrationResult> {
@@ -78,16 +74,12 @@ impl CalibrationManager {
         if !self.active {
             return None;
         }
-        
-        // Detect mouse click
-        let mouse_down = is_left_mouse_down();
-        let just_pressed = mouse_down && !self.last_mouse_state;
-        self.last_mouse_state = mouse_down;
-        
-        if !just_pressed {
+
+        // Detect mouse click even if it was a quick press between frames
+        if !was_left_mouse_pressed() {
             return None;
         }
-        
+
         // Check if click is on game window
         if let Some(cursor_hwnd) = get_window_under_cursor() {
             if is_game_window_or_child(cursor_hwnd, game_hwnd) {
@@ -98,10 +90,10 @@ impl CalibrationManager {
                 }
             }
         }
-        
+
         None
     }
-    
+
     fn process_click(&mut self, x: i32, y: i32) -> Option<CalibrationResult> {
         if self.is_area {
             // Area calibration (2 clicks)
@@ -116,7 +108,7 @@ impl CalibrationManager {
                 let top = y1.min(y);
                 let width = (x1.max(x) - left).abs();
                 let height = (y1.max(y) - top).abs();
-                
+
                 self.active = false;
                 self.area_start = None;
                 Some(CalibrationResult::Area(left, top, width, height))
