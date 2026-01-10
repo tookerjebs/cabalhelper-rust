@@ -6,10 +6,10 @@ use crate::settings::AppSettings;
 /// Common interface that all tools must implement
 pub trait Tool {
 
-    
+
     /// Stop the tool (emergency stop)
     fn stop(&mut self);
-    
+
     /// Check if the tool is currently running
     fn is_running(&self) -> bool;
 
@@ -18,4 +18,7 @@ pub trait Tool {
 
     /// Update loop for UI and logic
     fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut AppSettings, game_hwnd: Option<HWND>);
+
+    /// Read current status log (for UI display)
+    fn get_log(&self) -> Vec<String>;
 }

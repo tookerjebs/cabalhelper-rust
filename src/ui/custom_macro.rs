@@ -21,7 +21,6 @@ pub fn render_ui(
     ocr_calibrating_action_index: Option<usize>,
     is_running: bool,
     status: &str,
-    status_log: &[String],
     game_connected: bool,
     can_delete: bool, // Can this macro be deleted?
 ) -> CustomMacroUiAction {
@@ -445,16 +444,6 @@ pub fn render_ui(
 
         ui.label(egui::RichText::new(status).color(status_color));
     });
-
-    ui.add_space(6.0);
-    ui.label(egui::RichText::new("Log:").strong());
-    egui::ScrollArea::vertical()
-        .max_height(120.0)
-        .show(ui, |ui| {
-            for line in status_log {
-                ui.label(egui::RichText::new(line).monospace());
-            }
-        });
 
     action
 }

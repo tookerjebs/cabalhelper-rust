@@ -6,6 +6,7 @@ pub enum HeaderAction {
     Connect(HWND),
     Disconnect,
     Save,
+    ToggleLog,
     ToggleOverlay,
     None
 }
@@ -18,12 +19,12 @@ pub fn render_header(
     game_title: &mut String,
 ) -> HeaderAction {
     let mut action = HeaderAction::None;
-    
+
     ui.horizontal(|ui| {
         // --- Left Side: Game Connection Status Text only ---
         if let Some(hwnd) = game_hwnd {
             ui.label(egui::RichText::new(game_title.as_str()).color(egui::Color32::GREEN).strong());
-            
+
             // Show minimal window info: just resolution
             if let Some((_, _, w, h)) = crate::core::window::get_client_rect_in_screen_coords(*hwnd) {
                 ui.label(egui::RichText::new("•").color(egui::Color32::DARK_GRAY));
@@ -39,7 +40,11 @@ pub fn render_header(
             if ui.button("Save Settings").clicked() {
                 action = HeaderAction::Save;
             }
-            
+
+            if ui.button("Log").clicked() {
+                action = HeaderAction::ToggleLog;
+            }
+
             // Overlay Toggle (No Icon)
             if ui.button("Overlay").clicked() {
                 action = HeaderAction::ToggleOverlay;
@@ -65,6 +70,6 @@ pub fn render_header(
             }
         });
     });
-    
+
     action
 }
