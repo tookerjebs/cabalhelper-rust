@@ -80,6 +80,7 @@ impl Tool for CollectionFillerTool {
 
         let is_running = self.worker.is_running();
         let status = self.worker.get_status();
+        let status_log = self.worker.get_log();
 
         // Render UI and get action
         let action = crate::ui::collection_filler::render_ui(
@@ -90,6 +91,7 @@ impl Tool for CollectionFillerTool {
             &self.calibrating_item,
             is_running,
             &status,
+            &status_log,
             game_hwnd.is_some(),
         );
 
@@ -149,7 +151,7 @@ impl CollectionFillerTool {
         self.worker.set_status("Starting automation...");
         let red_dot_path = settings.red_dot_path.clone();
 
-        self.worker.start(move |running: Arc<Mutex<bool>>, status: Arc<Mutex<String>>| {
+        self.worker.start(move |running: Arc<Mutex<bool>>, status: Arc<Mutex<String>>, _log: Arc<Mutex<std::collections::VecDeque<String>>>| {
             let mut ctx = match AutomationContext::new(game_hwnd) {
                 Ok(c) => c,
                 Err(e) => {

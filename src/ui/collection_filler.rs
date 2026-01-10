@@ -37,6 +37,7 @@ pub fn render_ui(
     calibrating_item: &Option<CalibrationItem>,
     is_running: bool,
     status: &str,
+    status_log: &[String],
     game_connected: bool,
 ) -> UiAction {
     let mut action = UiAction::None;
@@ -169,6 +170,16 @@ pub fn render_ui(
 
         ui.label(egui::RichText::new(status).color(status_color));
     });
+
+    ui.add_space(6.0);
+    ui.label(egui::RichText::new("Log:").strong());
+    egui::ScrollArea::vertical()
+        .max_height(120.0)
+        .show(ui, |ui| {
+            for line in status_log {
+                ui.label(egui::RichText::new(line).monospace());
+            }
+        });
 
     action
 }

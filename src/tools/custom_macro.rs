@@ -121,6 +121,7 @@ impl Tool for CustomMacroTool {
 
         let is_running = self.worker.is_running();
         let status = self.worker.get_status();
+        let status_log = self.worker.get_log();
         let click_calibrating_index = self.calibrating_action_index;
         let ocr_calibrating_index = self.ocr_calibrating_action_index;
 
@@ -131,6 +132,7 @@ impl Tool for CustomMacroTool {
             ocr_calibrating_index,
             is_running,
             &status,
+            &status_log,
             game_hwnd.is_some(),
             can_delete
         );
@@ -186,7 +188,7 @@ impl CustomMacroTool {
         self.worker.set_status("Running macro...");
 
         // Use generic worker
-        self.worker.start(move |running: Arc<Mutex<bool>>, status: Arc<Mutex<String>>| {
+        self.worker.start(move |running: Arc<Mutex<bool>>, status: Arc<Mutex<String>>, log: Arc<Mutex<std::collections::VecDeque<String>>>| {
             use crate::core::input::click_at_position;
             use crate::automation::context::AutomationContext;
             use crate::core::screen_capture::capture_region;
@@ -425,6 +427,7 @@ impl CustomMacroTool {
                                     match engine.get_text(&ocr_input) {
                                         Ok(text) => {
                                             *status.lock().unwrap() = format!("OCR: {}", text);
+                                            Worker::push_log(&log, &format!("OCR RAW: {}", text));
 
                                             if let Some((detected_stat, detected_value)) = parse_ocr_result(&text) {
                                                 let normalize_contains = |s: &str| -> String {

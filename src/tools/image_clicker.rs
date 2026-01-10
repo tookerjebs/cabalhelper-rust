@@ -89,6 +89,7 @@ impl Tool for ImageClickerTool {
 
         let is_running = self.worker.is_running();
         let status = self.worker.get_status();
+        let status_log = self.worker.get_log();
         let is_calibrating = self.calibration.is_active();
         let is_waiting_for_second_click = self.calibration.is_waiting_for_second_click();
 
@@ -102,6 +103,7 @@ impl Tool for ImageClickerTool {
             is_waiting_for_second_click,
             is_running,
             &status,
+            &status_log,
             game_hwnd.is_some(),
         );
 
@@ -144,7 +146,7 @@ impl ImageClickerTool {
 
         let image_path = settings.image_path.clone(); // Clone for thread
 
-        self.worker.start(move |running: Arc<Mutex<bool>>, status: Arc<Mutex<String>>| {
+        self.worker.start(move |running: Arc<Mutex<bool>>, status: Arc<Mutex<String>>, _log: Arc<Mutex<std::collections::VecDeque<String>>>| {
             let mut ctx = match AutomationContext::new(game_hwnd) {
                 Ok(c) => c,
                 Err(e) => {
