@@ -13,7 +13,7 @@ use crate::core::worker::Worker;
 pub struct CollectionFillerTool {
     // Runtime state (Worker)
     worker: Worker,
-    
+
     // Calibration
     calibration: CalibrationManager,
     calibrating_item: Option<CalibrationItem>,
@@ -45,7 +45,7 @@ impl Tool for CollectionFillerTool {
 
     fn start(&mut self, app_settings: &crate::settings::AppSettings, game_hwnd: Option<HWND>) {
          let settings = &app_settings.collection_filler;
-         
+
          if self.is_fully_calibrated(settings) {
              if let Some(hwnd) = game_hwnd {
                  self.start_automation(settings.clone(), hwnd);
@@ -59,7 +59,7 @@ impl Tool for CollectionFillerTool {
 
     fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut crate::settings::AppSettings, game_hwnd: Option<HWND>) {
         let settings = &mut settings.collection_filler;
-        
+
         // Handle calibration interaction
         if let Some(hwnd) = game_hwnd {
             if let Some(result) = self.calibration.update(hwnd) {
@@ -80,7 +80,7 @@ impl Tool for CollectionFillerTool {
 
         let is_running = self.worker.is_running();
         let status = self.worker.get_status();
-        
+
         // Render UI and get action
         let action = crate::ui::collection_filler::render_ui(
             ui,
@@ -99,7 +99,7 @@ impl Tool for CollectionFillerTool {
                 self.calibrating_item = Some(item.clone());
                 if is_area {
                     self.calibration.start_area();
-                    self.worker.set_status("Click TOP-LEFT corner");
+                    self.worker.set_status("Click and drag to select area");
                 } else {
                     self.calibration.start_point();
                     self.worker.set_status("Click the button");
@@ -199,19 +199,19 @@ fn run_automation_loop(
                 break;
             }
         };
-        
+
         // Filter by color to keep only RED dots (not grey dots)
         let red_dots = crate::automation::detection::filter_red_dots(
             potential_dots,
             settings.min_red,
             settings.red_dominance
         );
-        
+
         if red_dots.is_empty() {
             *status.lock().unwrap() = "All collections complete!".to_string();
             break;
         }
-        
+
         let tab_pos = red_dots[0];
         *status.lock().unwrap() = "Found tab, clicking...".to_string();
         click_at_screen(&mut ctx.gui, tab_pos.0, tab_pos.1);
@@ -230,7 +230,7 @@ fn process_dungeon_list(
 ) {
     let mut current_page = 1;
     let mut pages_checked_this_cycle = 0;
-    
+
     let tab_check = |gui: &mut rustautogui::RustAutoGui| -> bool {
          find_stored_template(gui, "tabs_dots", settings.red_dot_tolerance)
             .map(|dots| dots.iter().any(|d| {
@@ -240,15 +240,15 @@ fn process_dungeon_list(
 
     while *running.lock().unwrap() && tab_check(&mut ctx.gui) {
         *status.lock().unwrap() = format!("Processing page {}", current_page);
-        
+
         let found_work = process_page_dungeons(ctx, settings, running, status);
-        
+
         if found_work {
             current_page = 1;
             pages_checked_this_cycle = 0;
         } else {
              pages_checked_this_cycle += 1;
-             
+
              if current_page < 4 {
                  current_page += 1;
                  let btn = match current_page {
@@ -266,14 +266,14 @@ fn process_dungeon_list(
                       if let Some((x, y)) = settings.arrow_right_pos {
                           click_at_window_pos(&mut ctx.gui, ctx.game_hwnd, x, y);
                           delay_ms(settings.delay_ms);
-                          current_page = 1; 
+                          current_page = 1;
                       } else {
                           break;
                       }
                  }
              }
-             
-             if pages_checked_this_cycle > 8 { 
+
+             if pages_checked_this_cycle > 8 {
                  break;
              }
         }
@@ -295,17 +295,17 @@ fn process_page_dungeons(
             Some(dots) if !dots.is_empty() => dots,
             _ => break // No more dungeons on this page
         };
-        
+
         let red_dots = crate::automation::detection::filter_red_dots(
             potential_dots,
             settings.min_red,
             settings.red_dominance
         );
-        
+
         if red_dots.is_empty() {
             break; // No red dungeons on this page
         }
-        
+
         let dungeon_dot = red_dots[0];
 
         // Found a dungeon with a red dot
@@ -352,7 +352,7 @@ fn process_page_dungeons(
              *status.lock().unwrap() = "Dungeon timeout/stuck, scanning list again...".to_string();
         }
     }
-    
+
     any_work_done
 }
 
@@ -365,23 +365,23 @@ fn process_visible_items(
     let mut processed = false;
     let mut last_pos: Option<(u32, u32)> = None;
     let mut stuck_hits = 0;
-    
+
     while *running.lock().unwrap() {
         // Find potential item dots and filter by color
         let potential_dots = match find_stored_template(&mut ctx.gui, "items_dots", settings.red_dot_tolerance) {
             Some(dots) if !dots.is_empty() => dots,
             _ => break
         };
-        
+
         let red_dots = crate::automation::detection::filter_red_dots(
             potential_dots,
             settings.min_red,
             settings.red_dominance
         );
-        
+
         match red_dots.first() {
             Some(&pos) => {
-                
+
                 // Stuck check
                 if let Some(last) = last_pos {
                      if is_position_near(pos, last, 5.0) {
@@ -395,10 +395,10 @@ fn process_visible_items(
                      }
                 }
                 last_pos = Some(pos);
-                
+
                 click_at_screen(&mut ctx.gui, pos.0, pos.1);
                 delay_ms(settings.delay_ms);
-                
+
                 let btns = [settings.auto_refill_pos, settings.register_pos, settings.yes_pos];
                 for btn in btns {
                     if let Some((x, y)) = btn {
@@ -406,9 +406,9 @@ fn process_visible_items(
                          delay_ms(settings.delay_ms);
                     }
                 }
-                
+
                 processed = true;
-                delay_ms(settings.delay_ms); 
+                delay_ms(settings.delay_ms);
             },
             None => break
         }

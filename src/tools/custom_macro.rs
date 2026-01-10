@@ -68,7 +68,7 @@ impl Tool for CustomMacroTool {
         }
     }
 
-    fn update(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut crate::settings::AppSettings, game_hwnd: Option<HWND>) {
+    fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut crate::settings::AppSettings, game_hwnd: Option<HWND>) {
         if self.macro_index >= settings.custom_macros.len() {
             ui.colored_label(egui::Color32::RED, "Error: Macro profile not found");
             return;
@@ -115,6 +115,10 @@ impl Tool for CustomMacroTool {
              }
         }
 
+        if self.calibration.is_active() || self.ocr_region_calibration.is_active() {
+            ctx.request_repaint();
+        }
+
         let is_running = self.worker.is_running();
         let status = self.worker.get_status();
         let click_calibrating_index = self.calibrating_action_index;
@@ -145,7 +149,7 @@ impl Tool for CustomMacroTool {
             CustomMacroUiAction::StartOcrRegionCalibration(action_index) => {
                 self.ocr_calibrating_action_index = Some(action_index);
                 self.ocr_region_calibration.start_area();
-                self.worker.set_status("Click TOP-LEFT corner of OCR region");
+                self.worker.set_status("Click and drag to select OCR region");
             },
             CustomMacroUiAction::CancelOcrRegionCalibration => {
                 self.ocr_region_calibration.cancel();

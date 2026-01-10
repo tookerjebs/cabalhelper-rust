@@ -14,10 +14,10 @@ pub struct ImageClickerTool {
     // UI state
     interval_ms_str: String,
     settings_synced: bool,
-    
+
     // Runtime state (Worker)
     worker: Worker,
-    
+
     // Calibration
     calibration: CalibrationManager,
 }
@@ -49,7 +49,7 @@ impl Tool for ImageClickerTool {
 
     fn start(&mut self, app_settings: &crate::settings::AppSettings, game_hwnd: Option<HWND>) {
          let settings = &app_settings.accept_item;
-         
+
          if let Some(hwnd) = game_hwnd {
              self.start_automation(settings.clone(), hwnd);
          } else {
@@ -81,7 +81,7 @@ impl Tool for ImageClickerTool {
                  self.worker.set_status("Disconnected");
              }
         }
-        
+
         // Repaint if calibrating to capture clicks immediately
         if self.calibration.is_active() {
              ctx.request_repaint();
@@ -90,7 +90,7 @@ impl Tool for ImageClickerTool {
         let is_running = self.worker.is_running();
         let status = self.worker.get_status();
         let is_calibrating = self.calibration.is_active();
-        let is_waiting = self.calibration.is_waiting_for_second_click();
+        let is_dragging = self.calibration.is_dragging();
 
         let action = render_ui(
             ui,
@@ -99,7 +99,7 @@ impl Tool for ImageClickerTool {
             &mut settings.tolerance,
             settings.search_region,
             is_calibrating,
-            is_waiting,
+            is_dragging,
             is_running,
             &status,
             game_hwnd.is_some(),
@@ -113,7 +113,7 @@ impl Tool for ImageClickerTool {
         match action {
             ImageUiAction::StartRegionCalibration => {
                 self.calibration.start_area();
-                self.worker.set_status("Click TOP-LEFT corner of search region");
+                self.worker.set_status("Click and drag to select the search region");
             },
             ImageUiAction::CancelCalibration => {
                 self.calibration.cancel();
@@ -153,7 +153,7 @@ impl ImageClickerTool {
                     return;
                 }
             };
-            
+
             if let Err(e) = ctx.store_template(&image_path, settings.search_region, "target_image") {
                  *status.lock().unwrap() = format!("Image Error: {}", e);
                  *running.lock().unwrap() = false;
@@ -167,19 +167,19 @@ impl ImageClickerTool {
                 match find_stored_template(&mut ctx.gui, "target_image", settings.tolerance) {
                     Some(matches) if !matches.is_empty() => {
                         let (screen_x, screen_y) = matches[0];
-                        
+
                         *status.lock().unwrap() = format!("Found at ({}, {}), clicking...", screen_x, screen_y);
-                        
+
                         // Convert screen coords to window coords for Direct Click
                         use crate::core::window::screen_to_window_coords;
                         use crate::core::input::click_at_position;
-                        
+
                         if let Some((client_x, client_y)) = screen_to_window_coords(game_hwnd, screen_x as i32, screen_y as i32) {
                              click_at_position(game_hwnd, client_x, client_y);
                         } else {
                              *status.lock().unwrap() = "Error converting coordinates".to_string();
                         }
-                        
+
                         // Hardcoded safety delay after click to prevent double-clicking
                         delay_ms(500);
                     },
@@ -187,11 +187,11 @@ impl ImageClickerTool {
                         *status.lock().unwrap() = "Searching...".to_string();
                     }
                 }
-                
+
                 // User-configured polling interval (how often to check screen)
                 delay_ms(settings.interval_ms);
             }
-            
+
             *status.lock().unwrap() = "Stopped".to_string();
         });
     }

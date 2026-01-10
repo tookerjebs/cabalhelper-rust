@@ -15,7 +15,7 @@ pub fn find_game_window() -> Option<(HWND, String)> {
             windows::core::PCSTR("D3D Window\0".as_ptr()),
             windows::core::PCSTR::null(),
         );
-        
+
         if hwnd.0 != 0 && IsWindow(hwnd).as_bool() {
             // Get actual window title
             let mut buffer = [0u8; 256];
@@ -77,6 +77,11 @@ pub fn get_client_rect_in_screen_coords(hwnd: HWND) -> Option<(i32, i32, i32, i3
             bottom_right.y - top_left.y  // Height
         ))
     }
+}
+
+/// Get client area origin (top-left) in screen coordinates
+pub fn get_client_origin_in_screen_coords(hwnd: HWND) -> Option<(i32, i32)> {
+    get_client_rect_in_screen_coords(hwnd).map(|(x, y, _w, _h)| (x, y))
 }
 
 /// Convert screen coordinates to window-relative coordinates
@@ -146,22 +151,20 @@ pub fn get_pixel_color(screen_x: i32, screen_y: i32) -> Option<(u8, u8, u8)> {
         if hdc.is_invalid() {
             return None;
         }
-        
+
         // Get pixel color as COLORREF (0x00BBGGRR format)
         let color = GetPixel(hdc, screen_x, screen_y);
-        
+
         // Release the device context
         let _ = ReleaseDC(HWND(0), hdc);
-        
+
         // Convert COLORREF to u32 for bitwise operations
         // COLORREF format: 0x00BBGGRR
         let color_val = color.0 as u32;
         let r = (color_val & 0xFF) as u8;
         let g = ((color_val >> 8) & 0xFF) as u8;
         let b = ((color_val >> 16) & 0xFF) as u8;
-        
+
         Some((r, g, b))
     }
 }
-
-

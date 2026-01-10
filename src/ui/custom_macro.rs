@@ -25,7 +25,7 @@ pub fn render_ui(
     can_delete: bool, // Can this macro be deleted?
 ) -> CustomMacroUiAction {
     let mut action = CustomMacroUiAction::None;
-    
+
     if !game_connected {
         ui.colored_label(egui::Color32::RED, "Please connect to game first (top right)");
         return CustomMacroUiAction::None;
@@ -36,7 +36,7 @@ pub fn render_ui(
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new("Macro Name:").strong());
             ui.text_edit_singleline(&mut named_macro.name);
-            
+
             if can_delete {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button(egui::RichText::new("Delete").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
@@ -45,9 +45,9 @@ pub fn render_ui(
                 });
             }
         });
-        
+
         ui.add_space(8.0);
-        
+
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new("Add Action:").strong());
             if ui.button("Click").clicked() {
@@ -102,7 +102,7 @@ pub fn render_ui(
         for (idx, macro_action) in named_macro.settings.actions.iter_mut().enumerate() {
             ui.group(|ui| {
                 ui.set_min_width(ui.available_width());
-                
+
                 ui.horizontal(|ui| {
                     // Reorder buttons (Vertical, Left) - Removed separator
                     ui.vertical(|ui| {
@@ -114,7 +114,7 @@ pub fn render_ui(
                         } else {
                              ui.add_space(20.0); // approximate button height placeholder
                         }
-                        
+
                         if idx < actions_len - 1 {
                              if ui.button("⬇").on_hover_text("Move Down").clicked() {
                                 to_move_down = Some(idx);
@@ -134,9 +134,9 @@ pub fn render_ui(
                                 MacroAction::Delay { .. } => "Delay",
                                 MacroAction::OcrSearch { .. } => "OCR Search",
                             };
-                            
+
                             ui.label(egui::RichText::new(format!("{}. {}", idx + 1, title)).strong().size(14.0));
-                            
+
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 if ui.small_button(egui::RichText::new("DEL").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
                                     to_remove = Some(idx);
@@ -156,7 +156,7 @@ pub fn render_ui(
                                     } else {
                                         ui.colored_label(egui::Color32::from_rgb(255, 100, 100), "Not set");
                                     }
-                                    
+
                                     let is_this_calibrating = click_calibrating_action_index == Some(idx);
                                     if is_this_calibrating {
                                         if ui.button(egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
@@ -173,7 +173,7 @@ pub fn render_ui(
                                     }
                                 });
                                 ui.add_space(2.0);
-                                
+
                                 ui.horizontal(|ui| {
                                     ui.label("Button:");
                                     ui.radio_value(button, MouseButton::Left, "Left");
@@ -234,7 +234,7 @@ pub fn render_ui(
                                             if ui.button(egui::RichText::new("Stop").color(egui::Color32::RED)).clicked() {
                                                 action = CustomMacroUiAction::CancelOcrRegionCalibration;
                                             }
-                                            ui.label(egui::RichText::new("Click TOP-LEFT, then BOTTOM-RIGHT").color(egui::Color32::YELLOW));
+                                            ui.label(egui::RichText::new("Click and drag to select region").color(egui::Color32::YELLOW));
                                         } else {
                                             if ui.button("Set Region").clicked() {
                                                 action = CustomMacroUiAction::StartOcrRegionCalibration(idx);
@@ -354,21 +354,21 @@ pub fn render_ui(
     ui.group(|ui| {
         ui.heading(egui::RichText::new("Loop Settings").size(14.0).strong());
         ui.add_space(4.0);
-        
+
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new("Don't forget to add delays between actions!")
                 .color(egui::Color32::from_rgb(255, 200, 100)).size(12.0));
         });
-        
+
         ui.add_space(8.0);
-        
+
         ui.horizontal(|ui| {
              ui.checkbox(&mut named_macro.settings.loop_enabled, "Enable Loop");
-             
+
              if named_macro.settings.loop_enabled {
                 ui.separator();
                 ui.checkbox(&mut named_macro.settings.infinite_loop, "Infinite");
-                
+
                 if !named_macro.settings.infinite_loop {
                     ui.label("Repeat:");
                     let mut count_str = named_macro.settings.loop_count.to_string();
@@ -392,10 +392,10 @@ pub fn render_ui(
         } else {
             ("Start Macro", egui::Color32::from_rgb(100, 255, 100))
         };
-        
+
         let button = egui::Button::new(egui::RichText::new(btn_text).size(16.0).color(btn_color))
             .min_size(egui::vec2(200.0, 35.0));
-        
+
         if ui.add(button).clicked() {
             action = if is_running {
                 CustomMacroUiAction::StopMacro
@@ -412,7 +412,7 @@ pub fn render_ui(
     // 5. Status Section
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Status:").strong());
-        
+
         let status_color = if status.contains("Running") || status.contains("Active") {
             egui::Color32::from_rgb(100, 255, 100)
         } else if status.contains("Error") || status.contains("Failed") {
@@ -420,9 +420,9 @@ pub fn render_ui(
         } else {
             egui::Color32::GRAY
         };
-        
+
         ui.label(egui::RichText::new(status).color(status_color));
     });
-    
+
     action
 }
