@@ -99,7 +99,7 @@ impl Tool for CollectionFillerTool {
                 self.calibrating_item = Some(item.clone());
                 if is_area {
                     self.calibration.start_area();
-                    self.worker.set_status("Click and drag to select area");
+                    self.worker.set_status("Click top-left, then bottom-right");
                 } else {
                     self.calibration.start_point();
                     self.worker.set_status("Click the button");

@@ -149,7 +149,7 @@ impl Tool for CustomMacroTool {
             CustomMacroUiAction::StartOcrRegionCalibration(action_index) => {
                 self.ocr_calibrating_action_index = Some(action_index);
                 self.ocr_region_calibration.start_area();
-                self.worker.set_status("Click and drag to select OCR region");
+                self.worker.set_status("Click top-left, then bottom-right");
             },
             CustomMacroUiAction::CancelOcrRegionCalibration => {
                 self.ocr_region_calibration.cancel();
@@ -296,24 +296,46 @@ impl CustomMacroTool {
                     }
 
                     match action {
-                        MacroAction::Click { coordinate, button: _, click_method, use_mouse_movement: _ } => {
+                        MacroAction::Click { coordinate, button, click_method, use_mouse_movement: _ } => {
                             if let Some((x, y)) = coordinate {
-                                *status.lock().unwrap() = format!("Clicking at ({}, {})", x, y);
+                                let btn_text = match button {
+                                    crate::settings::MouseButton::Left => "Left",
+                                    crate::settings::MouseButton::Right => "Right",
+                                };
+                                *status.lock().unwrap() = format!("{} Clicking at ({}, {})", btn_text, x, y);
 
                                 match click_method {
                                     crate::settings::ClickMethod::SendMessage => {
                                         // Direct click without mouse movement (default)
-                                        click_at_position(game_hwnd, *x, *y);
+                                        let is_left = matches!(button, crate::settings::MouseButton::Left);
+                                        if is_left {
+                                            click_at_position(game_hwnd, *x, *y);
+                                        } else {
+                                            use crate::core::input::right_click_at_position;
+                                            right_click_at_position(game_hwnd, *x, *y);
+                                        }
                                     },
                                     crate::settings::ClickMethod::PostMessage => {
                                         // Async click without mouse movement
-                                        use crate::core::input::click_at_position_post;
-                                        click_at_position_post(game_hwnd, *x, *y);
+                                        let is_left = matches!(button, crate::settings::MouseButton::Left);
+                                        if is_left {
+                                            use crate::core::input::click_at_position_post;
+                                            click_at_position_post(game_hwnd, *x, *y);
+                                        } else {
+                                            use crate::core::input::right_click_at_position_post;
+                                            right_click_at_position_post(game_hwnd, *x, *y);
+                                        }
                                     },
                                     crate::settings::ClickMethod::MouseMovement => {
                                         // Use screen coordinates with mouse movement
-                                        use crate::automation::interaction::click_at_screen;
-                                        click_at_screen(&mut ctx.gui, *x as u32, *y as u32);
+                                        let is_left = matches!(button, crate::settings::MouseButton::Left);
+                                        if is_left {
+                                            use crate::automation::interaction::click_at_screen;
+                                            click_at_screen(&mut ctx.gui, *x as u32, *y as u32);
+                                        } else {
+                                            use crate::automation::interaction::right_click_at_screen;
+                                            right_click_at_screen(&mut ctx.gui, *x as u32, *y as u32);
+                                        }
                                     },
                                 }
                             } else {

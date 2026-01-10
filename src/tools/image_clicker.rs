@@ -90,7 +90,7 @@ impl Tool for ImageClickerTool {
         let is_running = self.worker.is_running();
         let status = self.worker.get_status();
         let is_calibrating = self.calibration.is_active();
-        let is_dragging = self.calibration.is_dragging();
+        let is_waiting_for_second_click = self.calibration.is_waiting_for_second_click();
 
         let action = render_ui(
             ui,
@@ -99,7 +99,7 @@ impl Tool for ImageClickerTool {
             &mut settings.tolerance,
             settings.search_region,
             is_calibrating,
-            is_dragging,
+            is_waiting_for_second_click,
             is_running,
             &status,
             game_hwnd.is_some(),
@@ -113,7 +113,7 @@ impl Tool for ImageClickerTool {
         match action {
             ImageUiAction::StartRegionCalibration => {
                 self.calibration.start_area();
-                self.worker.set_status("Click and drag to select the search region");
+                self.worker.set_status("Click top-left, then bottom-right");
             },
             ImageUiAction::CancelCalibration => {
                 self.calibration.cancel();

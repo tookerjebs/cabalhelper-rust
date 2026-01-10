@@ -18,7 +18,7 @@ pub fn render_ui(
     tolerance: &mut f32,
     search_region: Option<(i32, i32, i32, i32)>,
     is_calibrating: bool,
-    is_dragging: bool,
+    is_waiting_for_second_click: bool,
     is_running: bool,
     status: &str,
     game_connected: bool,
@@ -99,11 +99,12 @@ pub fn render_ui(
                 if ui.button(egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
                     action = ImageUiAction::CancelCalibration;
                 }
-                if is_dragging {
-                    ui.label(egui::RichText::new("Release to finish...").color(egui::Color32::YELLOW));
+                let label = if is_waiting_for_second_click {
+                    "Click bottom-right..."
                 } else {
-                    ui.label(egui::RichText::new("Click and drag...").color(egui::Color32::YELLOW));
-                }
+                    "Click top-left..."
+                };
+                ui.label(egui::RichText::new(label).color(egui::Color32::YELLOW));
             } else {
                 if ui.button("Set Region").clicked() {
                     action = ImageUiAction::StartRegionCalibration;

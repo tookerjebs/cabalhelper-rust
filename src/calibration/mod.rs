@@ -1,8 +1,7 @@
 // Calibration module - shared calibration logic for all tools
 use windows::Win32::Foundation::HWND;
-use crate::core::input::{is_left_mouse_down, was_left_mouse_pressed};
-use crate::core::window::{get_window_under_cursor, is_game_window_or_child, get_cursor_pos, screen_to_window_coords, get_client_origin_in_screen_coords};
-use crate::core::screen_draw::draw_focus_rect_screen;
+use crate::core::input::was_left_mouse_pressed;
+use crate::core::window::{get_window_under_cursor, is_game_window_or_child, get_cursor_pos, screen_to_window_coords};
 
 /// Result of a calibration operation
 #[derive(Debug, Clone)]
@@ -15,10 +14,7 @@ pub enum CalibrationResult {
 pub struct CalibrationManager {
     active: bool,
     is_area: bool, // true for area calibration, false for point
-    drag_start: Option<(i32, i32)>,
-    last_pos: Option<(i32, i32)>,
-    dragging: bool,
-    last_drawn_rect: Option<(i32, i32, i32, i32)>,
+    area_start: Option<(i32, i32)>,
 }
 
 impl Default for CalibrationManager {
@@ -26,10 +22,7 @@ impl Default for CalibrationManager {
         Self {
             active: false,
             is_area: false,
-            drag_start: None,
-            last_pos: None,
-            dragging: false,
-            last_drawn_rect: None,
+            area_start: None,
         }
     }
 }
@@ -43,29 +36,20 @@ impl CalibrationManager {
     pub fn start_point(&mut self) {
         self.active = true;
         self.is_area = false;
-        self.drag_start = None;
-        self.last_pos = None;
-        self.dragging = false;
-        self.clear_overlay();
+        self.area_start = None;
     }
 
-    /// Start calibrating an area (click and drag)
+    /// Start calibrating an area (click top-left, then bottom-right)
     pub fn start_area(&mut self) {
         self.active = true;
         self.is_area = true;
-        self.drag_start = None;
-        self.last_pos = None;
-        self.dragging = false;
-        self.clear_overlay();
+        self.area_start = None;
     }
 
     /// Cancel current calibration
     pub fn cancel(&mut self) {
         self.active = false;
-        self.drag_start = None;
-        self.last_pos = None;
-        self.dragging = false;
-        self.clear_overlay();
+        self.area_start = None;
     }
 
     /// Check if calibration is active
@@ -73,9 +57,9 @@ impl CalibrationManager {
         self.active
     }
 
-    /// Check if currently dragging an area
-    pub fn is_dragging(&self) -> bool {
-        self.is_area && self.dragging
+    /// Check if an area calibration is waiting for the second click
+    pub fn is_waiting_for_second_click(&self) -> bool {
+        self.is_area && self.area_start.is_some()
     }
 
     /// Main update loop for calibration
@@ -91,7 +75,7 @@ impl CalibrationManager {
             return None;
         }
 
-        let mut cursor_in_game = || -> Option<(i32, i32)> {
+        let cursor_in_game = || -> Option<(i32, i32)> {
             if let Some(cursor_hwnd) = get_window_under_cursor() {
                 if is_game_window_or_child(cursor_hwnd, game_hwnd) {
                     if let Some((screen_x, screen_y)) = get_cursor_pos() {
@@ -103,47 +87,23 @@ impl CalibrationManager {
         };
 
         if self.is_area {
-            if !self.dragging {
-                if !was_left_mouse_pressed() {
-                    return None;
-                }
-
-                if let Some((x, y)) = cursor_in_game() {
-                    self.drag_start = Some((x, y));
-                    self.last_pos = Some((x, y));
-                    self.dragging = true;
-                }
+            if !was_left_mouse_pressed() {
                 return None;
             }
 
             if let Some((x, y)) = cursor_in_game() {
-                self.last_pos = Some((x, y));
-            }
-
-            if let (Some((x1, y1)), Some((x2, y2))) = (self.drag_start, self.last_pos) {
-                self.update_overlay_rect(game_hwnd, x1, y1, x2, y2);
-            }
-
-            if !is_left_mouse_down() {
-                if let (Some((x1, y1)), Some((x2, y2))) = (self.drag_start, self.last_pos) {
-                    let left = x1.min(x2);
-                    let top = y1.min(y2);
-                    let width = (x1.max(x2) - left).abs();
-                    let height = (y1.max(y2) - top).abs();
+                if let Some((x1, y1)) = self.area_start {
+                    let left = x1.min(x);
+                    let top = y1.min(y);
+                    let width = (x1.max(x) - left).abs();
+                    let height = (y1.max(y) - top).abs();
 
                     self.active = false;
-                    self.drag_start = None;
-                    self.last_pos = None;
-                    self.dragging = false;
-                    self.clear_overlay();
+                    self.area_start = None;
                     return Some(CalibrationResult::Area(left, top, width, height));
                 }
 
-                self.active = false;
-                self.drag_start = None;
-                self.last_pos = None;
-                self.dragging = false;
-                self.clear_overlay();
+                self.area_start = Some((x, y));
             }
 
             return None;
@@ -159,35 +119,5 @@ impl CalibrationManager {
         }
 
         None
-    }
-
-    fn update_overlay_rect(&mut self, game_hwnd: HWND, x1: i32, y1: i32, x2: i32, y2: i32) {
-        let (left, top) = match get_client_origin_in_screen_coords(game_hwnd) {
-            Some(origin) => origin,
-            None => return,
-        };
-
-        let screen_left = left + x1.min(x2);
-        let screen_top = top + y1.min(y2);
-        let screen_right = left + x1.max(x2);
-        let screen_bottom = top + y1.max(y2);
-
-        let new_rect = (screen_left, screen_top, screen_right, screen_bottom);
-
-        if let Some(prev) = self.last_drawn_rect {
-            if prev == new_rect {
-                return;
-            }
-            draw_focus_rect_screen(prev);
-        }
-
-        draw_focus_rect_screen(new_rect);
-        self.last_drawn_rect = Some(new_rect);
-    }
-
-    fn clear_overlay(&mut self) {
-        if let Some(prev) = self.last_drawn_rect.take() {
-            draw_focus_rect_screen(prev);
-        }
     }
 }

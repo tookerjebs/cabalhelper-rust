@@ -234,7 +234,7 @@ pub fn render_ui(
                                             if ui.button(egui::RichText::new("Stop").color(egui::Color32::RED)).clicked() {
                                                 action = CustomMacroUiAction::CancelOcrRegionCalibration;
                                             }
-                                            ui.label(egui::RichText::new("Click and drag to select region").color(egui::Color32::YELLOW));
+                                            ui.label(egui::RichText::new("Click top-left, then bottom-right").color(egui::Color32::YELLOW));
                                         } else {
                                             if ui.button("Set Region").clicked() {
                                                 action = CustomMacroUiAction::StartOcrRegionCalibration(idx);

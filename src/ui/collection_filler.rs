@@ -201,11 +201,12 @@ fn render_area_calibration(
             if ui.button(egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
                 action = Some(UiAction::CancelCalibration);
             }
-            if calibration.is_dragging() {
-                ui.label(egui::RichText::new("Release to finish").color(egui::Color32::YELLOW));
+            let label = if calibration.is_waiting_for_second_click() {
+                "Click bottom-right"
             } else {
-                ui.label(egui::RichText::new("Click and drag").color(egui::Color32::YELLOW));
-            }
+                "Click top-left"
+            };
+            ui.label(egui::RichText::new(label).color(egui::Color32::YELLOW));
         } else {
             if ui.button("Set").clicked() {
                 action = Some(UiAction::StartCalibration(item.clone(), true));

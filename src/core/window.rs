@@ -79,11 +79,6 @@ pub fn get_client_rect_in_screen_coords(hwnd: HWND) -> Option<(i32, i32, i32, i3
     }
 }
 
-/// Get client area origin (top-left) in screen coordinates
-pub fn get_client_origin_in_screen_coords(hwnd: HWND) -> Option<(i32, i32)> {
-    get_client_rect_in_screen_coords(hwnd).map(|(x, y, _w, _h)| (x, y))
-}
-
 /// Convert screen coordinates to window-relative coordinates
 pub fn screen_to_window_coords(hwnd: HWND, screen_x: i32, screen_y: i32) -> Option<(i32, i32)> {
     unsafe {
