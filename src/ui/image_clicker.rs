@@ -25,9 +25,6 @@ pub fn render_ui(
 ) -> ImageUiAction {
     let mut action = ImageUiAction::None;
 
-    // Introduction
-    ui.label(egui::RichText::new("Automatically finds and clicks an image (e.g., accept button).").italics());
-
     if !game_connected {
         ui.colored_label(egui::Color32::RED, "Please connect to game first (top right)");
         return ImageUiAction::None;
