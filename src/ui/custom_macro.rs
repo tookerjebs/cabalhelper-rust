@@ -78,6 +78,9 @@ pub fn render_ui(
                     beam_width: 10,
                     target_stat: String::new(),
                     target_value: 0,
+                    alt_target_enabled: false,
+                    alt_target_stat: String::new(),
+                    alt_target_value: 0,
                     comparison: ComparisonMode::Equals,
                     name_match_mode: OcrNameMatchMode::Exact,
                 });
@@ -217,6 +220,9 @@ pub fn render_ui(
                                 beam_width,
                                 target_stat,
                                 target_value,
+                                alt_target_enabled,
+                                alt_target_stat,
+                                alt_target_value,
                                 comparison,
                                 name_match_mode,
                             } => {
@@ -295,6 +301,21 @@ pub fn render_ui(
                                         if ui.text_edit_singleline(&mut val_str).changed() {
                                             if let Ok(v) = val_str.parse() {
                                                 *target_value = v;
+                                            }
+                                        }
+                                    });
+
+                                    ui.horizontal(|ui| {
+                                        ui.checkbox(alt_target_enabled, "Alt target (OR)");
+                                        if *alt_target_enabled {
+                                            ui.label("Stat:");
+                                            ui.text_edit_singleline(alt_target_stat);
+                                            ui.label("Value:");
+                                            let mut val_str = alt_target_value.to_string();
+                                            if ui.text_edit_singleline(&mut val_str).changed() {
+                                                if let Ok(v) = val_str.parse() {
+                                                    *alt_target_value = v;
+                                                }
                                             }
                                         }
                                     });

@@ -359,6 +359,9 @@ impl CustomMacroTool {
                             grayscale,
                             target_stat,
                             target_value,
+                            alt_target_enabled,
+                            alt_target_stat,
+                            alt_target_value,
                             comparison,
                             name_match_mode,
                             ..
@@ -424,32 +427,47 @@ impl CustomMacroTool {
                                             *status.lock().unwrap() = format!("OCR: {}", text);
 
                                             if let Some((detected_stat, detected_value)) = parse_ocr_result(&text) {
-                                                let matched = match name_match_mode {
-                                                    OcrNameMatchMode::Exact => {
-                                                        matches_target(
+                                                let normalize_contains = |s: &str| -> String {
+                                                    s.chars()
+                                                        .filter(|c| c.is_ascii_alphanumeric())
+                                                        .flat_map(|c| c.to_lowercase())
+                                                        .collect()
+                                                };
+
+                                                let matches_config = |stat: &str, value: i32| -> bool {
+                                                    if stat.trim().is_empty() {
+                                                        return false;
+                                                    }
+                                                    match name_match_mode {
+                                                        OcrNameMatchMode::Exact => matches_target(
                                                             &detected_stat,
                                                             detected_value,
-                                                            target_stat,
-                                                            *target_value,
+                                                            stat,
+                                                            value,
                                                             *comparison,
-                                                        )
-                                                    }
-                                                    OcrNameMatchMode::Contains => {
-                                                        let detected = detected_stat.to_lowercase();
-                                                        let target = target_stat.to_lowercase().trim().to_string();
-                                                        if target.is_empty() {
-                                                            false
-                                                        } else if !detected.contains(&target) {
-                                                            false
-                                                        } else {
-                                                            match comparison {
-                                                                ComparisonMode::Equals => detected_value == *target_value,
-                                                                ComparisonMode::GreaterThanOrEqual => detected_value >= *target_value,
-                                                                ComparisonMode::LessThanOrEqual => detected_value <= *target_value,
+                                                        ),
+                                                        OcrNameMatchMode::Contains => {
+                                                            let detected = normalize_contains(&detected_stat);
+                                                            let target = normalize_contains(stat);
+                                                            if target.is_empty() {
+                                                                false
+                                                            } else if !detected.contains(&target) {
+                                                                false
+                                                            } else {
+                                                                match comparison {
+                                                                    ComparisonMode::Equals => detected_value == value,
+                                                                    ComparisonMode::GreaterThanOrEqual => detected_value >= value,
+                                                                    ComparisonMode::LessThanOrEqual => detected_value <= value,
+                                                                }
                                                             }
                                                         }
                                                     }
                                                 };
+
+                                                let mut matched = matches_config(target_stat, *target_value);
+                                                if !matched && *alt_target_enabled {
+                                                    matched = matches_config(alt_target_stat, *alt_target_value);
+                                                }
 
                                                 if matched {
                                                     *status.lock().unwrap() =

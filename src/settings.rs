@@ -208,6 +208,12 @@ pub enum MacroAction {
         #[serde(default)]
         target_value: i32,
         #[serde(default)]
+        alt_target_enabled: bool,
+        #[serde(default)]
+        alt_target_stat: String,
+        #[serde(default)]
+        alt_target_value: i32,
+        #[serde(default)]
         comparison: ComparisonMode,
         #[serde(default)]
         name_match_mode: OcrNameMatchMode,
