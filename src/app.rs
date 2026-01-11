@@ -1,14 +1,13 @@
-use eframe::egui;
-use crate::tools::image_clicker::ImageClickerTool;
-use crate::tools::collection_filler::CollectionFillerTool;
-use crate::tools::custom_macro::CustomMacroTool;
-use crate::tools::r#trait::Tool;
 use crate::core::window::is_window_valid;
 use crate::settings::{AppSettings, NamedMacro, MAX_CUSTOM_MACROS};
+use crate::tools::collection_filler::CollectionFillerTool;
+use crate::tools::custom_macro::CustomMacroTool;
+use crate::tools::image_clicker::ImageClickerTool;
+use crate::tools::r#trait::Tool;
+use eframe::egui;
 use windows::Win32::Foundation::HWND;
 
 // Macro to toggle a tool with mutual exclusion
-
 
 pub struct CabalHelperApp {
     // Centralized settings
@@ -45,7 +44,10 @@ impl Default for CabalHelperApp {
         let (tools, tool_names) = Self::build_tools(&settings);
 
         // Set initial tab to first tool
-        let selected_tab = tool_names.get(0).cloned().unwrap_or_else(|| "Image Clicker".to_string());
+        let selected_tab = tool_names
+            .get(0)
+            .cloned()
+            .unwrap_or_else(|| "Image Clicker".to_string());
 
         Self {
             settings,
@@ -92,7 +94,11 @@ impl CabalHelperApp {
 
         // Ensure selected tab still exists
         if !self.tool_names.contains(&self.selected_tab) {
-            self.selected_tab = self.tool_names.get(0).cloned().unwrap_or_else(|| "Image Clicker".to_string());
+            self.selected_tab = self
+                .tool_names
+                .get(0)
+                .cloned()
+                .unwrap_or_else(|| "Image Clicker".to_string());
         }
     }
 }
@@ -135,7 +141,8 @@ impl eframe::App for CabalHelperApp {
         }
 
         if !self.is_overlay_mode && self.show_log_panel {
-            let log_snapshot = self.tool_names
+            let log_snapshot = self
+                .tool_names
                 .iter()
                 .position(|name| name == &self.selected_tab)
                 .and_then(|idx| self.tools.get(idx))
@@ -152,14 +159,24 @@ impl eframe::App for CabalHelperApp {
                         .inner_margin(egui::Margin::same(8.0))
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
-                                ui.label(egui::RichText::new("Log").strong().color(egui::Color32::LIGHT_GRAY));
-                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                    ui.label(
-                                        egui::RichText::new(format!("{} lines", log_snapshot.len()))
+                                ui.label(
+                                    egui::RichText::new("Log")
+                                        .strong()
+                                        .color(egui::Color32::LIGHT_GRAY),
+                                );
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| {
+                                        ui.label(
+                                            egui::RichText::new(format!(
+                                                "{} lines",
+                                                log_snapshot.len()
+                                            ))
                                             .small()
-                                            .color(egui::Color32::DARK_GRAY)
-                                    );
-                                });
+                                            .color(egui::Color32::DARK_GRAY),
+                                        );
+                                    },
+                                );
                             });
 
                             ui.add_space(6.0);
@@ -170,14 +187,14 @@ impl eframe::App for CabalHelperApp {
                                         ui.label(
                                             egui::RichText::new("No log entries yet.")
                                                 .italics()
-                                                .color(egui::Color32::DARK_GRAY)
+                                                .color(egui::Color32::DARK_GRAY),
                                         );
                                     } else {
                                         for line in log_snapshot {
                                             ui.label(
                                                 egui::RichText::new(line)
                                                     .monospace()
-                                                    .color(egui::Color32::from_rgb(200, 200, 200))
+                                                    .color(egui::Color32::from_rgb(200, 200, 200)),
                                             );
                                         }
                                     }
@@ -204,14 +221,17 @@ impl eframe::App for CabalHelperApp {
 
                         // Tool buttons with borders
                         for (idx, tool) in self.tools.iter().enumerate() {
-                           let is_running = tool.is_running();
-                           let name = self.tool_names.get(idx).map(|n| n.as_str()).unwrap_or("");
-                           let btn_text: String = name.chars().take(2).collect();
-                           let btn = egui::Button::new(
-                                egui::RichText::new(btn_text)
-                                    .size(16.0)
-                                    .strong()
-                                    .color(if is_running { egui::Color32::GREEN } else { egui::Color32::WHITE })
+                            let is_running = tool.is_running();
+                            let name = self.tool_names.get(idx).map(|n| n.as_str()).unwrap_or("");
+                            let btn_text: String = name.chars().take(2).collect();
+                            let btn = egui::Button::new(
+                                egui::RichText::new(btn_text).size(16.0).strong().color(
+                                    if is_running {
+                                        egui::Color32::GREEN
+                                    } else {
+                                        egui::Color32::WHITE
+                                    },
+                                ),
                             )
                             .min_size(egui::vec2(36.0, 36.0))
                             .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 60, 60)));
@@ -221,21 +241,25 @@ impl eframe::App for CabalHelperApp {
                             }
                         }
 
-                         // Settings button with border
-                         let btn = egui::Button::new(
-                                egui::RichText::new("⚙")
-                                    .size(12.0)
-                                    .color(egui::Color32::from_rgb(150, 150, 150))
-                            )
-                            .min_size(egui::vec2(24.0, 36.0))
-                            .fill(egui::Color32::from_rgba_premultiplied(40, 40, 40, 180))
-                            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 60, 60)));
+                        // Settings button with border
+                        let btn = egui::Button::new(
+                            egui::RichText::new("⚙")
+                                .size(12.0)
+                                .color(egui::Color32::from_rgb(150, 150, 150)),
+                        )
+                        .min_size(egui::vec2(24.0, 36.0))
+                        .fill(egui::Color32::from_rgba_premultiplied(40, 40, 40, 180))
+                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 60, 60)));
 
                         if ui.add(btn).clicked() {
                             self.is_overlay_mode = false;
                             ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(true));
-                            ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::Normal));
-                            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([600.0, 450.0].into()));
+                            ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(
+                                egui::WindowLevel::Normal,
+                            ));
+                            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(
+                                [600.0, 450.0].into(),
+                            ));
                         }
                     });
 
@@ -263,41 +287,49 @@ impl eframe::App for CabalHelperApp {
                 let action = crate::ui::app_header::render_header(
                     ui,
                     &mut self.game_hwnd,
-                    &mut self.status_message
+                    &mut self.status_message,
                 );
 
                 match action {
                     crate::ui::app_header::HeaderAction::Connect(hwnd) => {
                         self.game_hwnd = Some(hwnd);
-                    },
+                    }
                     crate::ui::app_header::HeaderAction::Disconnect => {
                         self.game_hwnd = None;
-                    },
+                    }
                     crate::ui::app_header::HeaderAction::Save => {
                         self.settings.auto_save();
-                    },
+                    }
                     crate::ui::app_header::HeaderAction::ToggleLog => {
                         self.show_log_panel = !self.show_log_panel;
-                    },
+                    }
                     crate::ui::app_header::HeaderAction::ToggleOverlay => {
                         self.is_overlay_mode = true;
                         ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(false));
-                        ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::AlwaysOnTop));
+                        ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(
+                            egui::WindowLevel::AlwaysOnTop,
+                        ));
 
                         // Dynamic overlay sizing
                         let num_tools = self.tools.len();
                         let overlay_width = (num_tools as f32 * 36.0) + 24.0; // 36px per tool + 24px settings button
-                        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([overlay_width, 36.0].into()));
+                        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(
+                            [overlay_width, 36.0].into(),
+                        ));
 
                         // Initial positioning: top-center of game window (one-time only)
                         if let Some(game_hwnd) = self.game_hwnd {
-                            if let Some((x, y, w, _h)) = crate::core::window::get_client_rect_in_screen_coords(game_hwnd) {
+                            if let Some((x, y, w, _h)) =
+                                crate::core::window::get_client_rect_in_screen_coords(game_hwnd)
+                            {
                                 let target_x = x + (w / 2) - (overlay_width as i32 / 2);
                                 let target_y = y as f32;
-                                ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition([target_x as f32, target_y].into()));
+                                ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(
+                                    [target_x as f32, target_y].into(),
+                                ));
                             }
                         }
-                    },
+                    }
                     crate::ui::app_header::HeaderAction::None => {}
                 }
 
@@ -305,17 +337,24 @@ impl eframe::App for CabalHelperApp {
 
                 // Dynamic Tab Rendering
                 ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(6.0, 0.0);
+
                     for (_idx, name) in self.tool_names.iter().enumerate() {
-                        if ui.selectable_label(self.selected_tab == *name, name).clicked() {
+                        if ui
+                            .selectable_label(self.selected_tab == *name, name)
+                            .clicked()
+                        {
                             self.selected_tab = name.clone();
                         }
                     }
 
-                    // Add "+ New Macro" button (only if under max limit)
                     if self.settings.custom_macros.len() < MAX_CUSTOM_MACROS {
-                        if ui.button("+ New Macro").clicked() {
-                            let new_macro_name = format!("Macro {}", self.settings.custom_macros.len() + 1);
-                            self.settings.custom_macros.push(NamedMacro::new(new_macro_name.clone()));
+                        if ui.button("New Macro").clicked() {
+                            let new_macro_name =
+                                format!("Macro {}", self.settings.custom_macros.len() + 1);
+                            self.settings
+                                .custom_macros
+                                .push(NamedMacro::new(new_macro_name.clone()));
                             self.rebuild_tools();
                             self.selected_tab = new_macro_name;
                             self.settings.auto_save();
@@ -327,7 +366,11 @@ impl eframe::App for CabalHelperApp {
 
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     // Find the selected tool by name and update it
-                    if let Some(idx) = self.tool_names.iter().position(|name| name == &self.selected_tab) {
+                    if let Some(idx) = self
+                        .tool_names
+                        .iter()
+                        .position(|name| name == &self.selected_tab)
+                    {
                         if let Some(tool) = self.tools.get_mut(idx) {
                             tool.update(ctx, ui, &mut self.settings, self.game_hwnd);
                         }

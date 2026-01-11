@@ -1,6 +1,6 @@
+use crate::core::window::find_game_window;
 use eframe::egui;
 use windows::Win32::Foundation::HWND;
-use crate::core::window::find_game_window;
 
 pub enum HeaderAction {
     Connect(HWND),
@@ -8,9 +8,8 @@ pub enum HeaderAction {
     Save,
     ToggleLog,
     ToggleOverlay,
-    None
+    None,
 }
-
 
 /// Render the unified app header (Connection Status + Utility Buttons)
 pub fn render_header(
@@ -21,38 +20,67 @@ pub fn render_header(
     let mut action = HeaderAction::None;
 
     ui.horizontal(|ui| {
-        // --- Left Side: Game Connection Status Text only ---
-        if let Some(hwnd) = game_hwnd {
-            ui.label(egui::RichText::new(game_title.as_str()).color(egui::Color32::GREEN).strong());
+        // --- Left Side: Connection status stack ---
+        ui.vertical(|ui| {
+            if let Some(hwnd) = game_hwnd {
+                ui.label(
+                    egui::RichText::new(format!("Connected to {}", game_title))
+                        .color(egui::Color32::from_rgb(168, 226, 187))
+                        .strong(),
+                );
 
-            // Show minimal window info: just resolution
-            if let Some((_, _, w, h)) = crate::core::window::get_client_rect_in_screen_coords(*hwnd) {
-                ui.label(egui::RichText::new("•").color(egui::Color32::DARK_GRAY));
-                ui.label(egui::RichText::new(format!("{}x{}", w, h)).color(egui::Color32::LIGHT_GRAY).small());
+                if let Some((_, _, w, h)) =
+                    crate::core::window::get_client_rect_in_screen_coords(*hwnd)
+                {
+                    ui.label(
+                        egui::RichText::new(format!("{}x{}", w, h))
+                            .color(egui::Color32::from_rgb(140, 140, 140))
+                            .small(),
+                    );
+                }
+            } else {
+                ui.label(
+                    egui::RichText::new(format!("Status: {}", game_title))
+                        .color(egui::Color32::from_rgb(200, 200, 200))
+                        .strong(),
+                );
             }
-        } else {
-            ui.label(egui::RichText::new("Not Connected").color(egui::Color32::GRAY));
-        }
+        });
 
         // --- Right Side: All Buttons ---
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-             // Save Settings
-            if ui.button("Save Settings").clicked() {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(6.0, 0.0);
+            let button_size = egui::vec2(90.0, 28.0);
+            let compact_size = egui::vec2(72.0, 28.0);
+
+            if ui
+                .add_sized(button_size, egui::Button::new("Save"))
+                .clicked()
+            {
                 action = HeaderAction::Save;
             }
 
-            if ui.button("Log").clicked() {
+            if ui
+                .add_sized(compact_size, egui::Button::new("Log"))
+                .clicked()
+            {
                 action = HeaderAction::ToggleLog;
             }
 
             // Overlay Toggle (No Icon)
-            if ui.button("Overlay").clicked() {
+            if ui
+                .add_sized(compact_size, egui::Button::new("Overlay"))
+                .clicked()
+            {
                 action = HeaderAction::ToggleOverlay;
             }
 
             // Connect/Disconnect Button
             if game_hwnd.is_none() {
-                if ui.button("Connect").clicked() {
+                if ui
+                    .add_sized(button_size, egui::Button::new("Connect"))
+                    .clicked()
+                {
                     if let Some((hwnd, title)) = find_game_window() {
                         *game_hwnd = Some(hwnd);
                         *game_title = title;
@@ -62,7 +90,10 @@ pub fn render_header(
                     }
                 }
             } else {
-                if ui.button("Disconnect").clicked() {
+                if ui
+                    .add_sized(button_size, egui::Button::new("Disconnect"))
+                    .clicked()
+                {
                     *game_hwnd = None;
                     *game_title = "Disconnected".to_string();
                     action = HeaderAction::Disconnect;
