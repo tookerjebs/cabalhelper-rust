@@ -29,6 +29,7 @@ pub struct CabalHelperApp {
     // Overlay state
     is_overlay_mode: bool,
     show_log_panel: bool,
+    show_help_window: bool,
 
     // Optimization state
     last_window_check: std::time::Instant,
@@ -58,6 +59,7 @@ impl Default for CabalHelperApp {
             status_message: "Ready".to_string(),
             is_overlay_mode: false,
             show_log_panel: false,
+            show_help_window: false,
             last_window_check: std::time::Instant::now(),
             last_esc_check: std::time::Instant::now(),
         }
@@ -297,9 +299,6 @@ impl eframe::App for CabalHelperApp {
                     crate::ui::app_header::HeaderAction::Disconnect => {
                         self.game_hwnd = None;
                     }
-                    crate::ui::app_header::HeaderAction::Save => {
-                        self.settings.auto_save();
-                    }
                     crate::ui::app_header::HeaderAction::ToggleLog => {
                         self.show_log_panel = !self.show_log_panel;
                     }
@@ -330,8 +329,50 @@ impl eframe::App for CabalHelperApp {
                             }
                         }
                     }
+                    crate::ui::app_header::HeaderAction::Help => {
+                        self.show_help_window = true;
+                    }
                     crate::ui::app_header::HeaderAction::None => {}
                 }
+
+                egui::Window::new("Help")
+                    .open(&mut self.show_help_window)
+                    .resizable(true)
+                    .default_width(420.0)
+                    .show(ctx, |ui| {
+                        ui.heading("Cabal Helper");
+                        ui.label("Automation tools for Cabal Online with overlay support.");
+                        ui.add_space(6.0);
+
+                        ui.collapsing("Overview", |ui| {
+                            ui.label("- Connect to the game window to enable tools.");
+                            ui.label("- Pick a tool tab, configure it, then Start.");
+                            ui.label("- ESC stops any running tool immediately.");
+                        });
+
+                        ui.collapsing("Click Methods (Custom Macro -> Click)", |ui| {
+                            ui.label("- Direct: SendMessage, default and reliable.");
+                            ui.label("- Move: moves the cursor and clicks physically.");
+                        });
+
+                        ui.collapsing("Settings and Options", |ui| {
+                            ui.label("- Image Clicker: image, interval, confidence, region.");
+                            ui.label("- Collection Filler: red dot, delay, tolerance.");
+                            ui.label("- Calibration sets areas and button positions.");
+                            ui.label("- OCR Search: region, scale, invert, grayscale, decode.");
+                        });
+
+                        ui.collapsing("Overlay and Log", |ui| {
+                            ui.label("- Overlay is an always-on-top tool bar.");
+                            ui.label("- Drag the overlay bar to reposition it.");
+                            ui.label("- Log panel shows output for the active tab.");
+                        });
+
+                        ui.collapsing("Autosave", |ui| {
+                            ui.label("- Settings auto-save after changes.");
+                            ui.label("- No manual save button is required.");
+                        });
+                    });
 
                 ui.separator();
 

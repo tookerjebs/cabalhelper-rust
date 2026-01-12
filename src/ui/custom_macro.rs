@@ -1,5 +1,7 @@
+use crate::settings::{
+    ComparisonMode, MacroAction, MouseButton, NamedMacro, OcrDecodeMode, OcrNameMatchMode,
+};
 use eframe::egui;
-use crate::settings::{MacroAction, MouseButton, NamedMacro, OcrDecodeMode, OcrNameMatchMode, ComparisonMode};
 
 #[derive(Debug)]
 pub enum CustomMacroUiAction {
@@ -27,7 +29,10 @@ pub fn render_ui(
     let mut action = CustomMacroUiAction::None;
 
     if !game_connected {
-        ui.colored_label(egui::Color32::RED, "Please connect to game first (top right)");
+        ui.colored_label(
+            egui::Color32::RED,
+            "Please connect to game first (top right)",
+        );
         return CustomMacroUiAction::None;
     }
 
@@ -39,7 +44,13 @@ pub fn render_ui(
 
             if can_delete {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button(egui::RichText::new("Delete").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
+                    if ui
+                        .button(
+                            egui::RichText::new("Delete")
+                                .color(egui::Color32::from_rgb(255, 100, 100)),
+                        )
+                        .clicked()
+                    {
                         action = CustomMacroUiAction::DeleteMacro;
                     }
                 });
@@ -64,9 +75,10 @@ pub fn render_ui(
                 });
             }
             if ui.button("Delay").clicked() {
-                named_macro.settings.actions.push(MacroAction::Delay {
-                    milliseconds: 100,
-                });
+                named_macro
+                    .settings
+                    .actions
+                    .push(MacroAction::Delay { milliseconds: 100 });
             }
             if ui.button("OCR Search").clicked() {
                 named_macro.settings.actions.push(MacroAction::OcrSearch {
@@ -95,7 +107,9 @@ pub fn render_ui(
     ui.add_space(4.0);
 
     if named_macro.settings.actions.is_empty() {
-        ui.label(egui::RichText::new("No actions yet. Add some using the buttons above!").italics());
+        ui.label(
+            egui::RichText::new("No actions yet. Add some using the buttons above!").italics(),
+        );
     } else {
         let mut to_remove: Option<usize> = None;
         let mut to_move_up: Option<usize> = None;
@@ -115,11 +129,11 @@ pub fn render_ui(
                                 to_move_up = Some(idx);
                             }
                         } else {
-                             ui.add_space(20.0); // approximate button height placeholder
+                            ui.add_space(20.0); // approximate button height placeholder
                         }
 
                         if idx < actions_len - 1 {
-                             if ui.button("⬇").on_hover_text("Move Down").clicked() {
+                            if ui.button("⬇").on_hover_text("Move Down").clicked() {
                                 to_move_down = Some(idx);
                             }
                         }
@@ -138,39 +152,79 @@ pub fn render_ui(
                                 MacroAction::OcrSearch { .. } => "OCR Search",
                             };
 
-                            ui.label(egui::RichText::new(format!("{}. {}", idx + 1, title)).strong().size(14.0));
+                            ui.label(
+                                egui::RichText::new(format!("{}. {}", idx + 1, title))
+                                    .strong()
+                                    .size(14.0),
+                            );
 
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                if ui.small_button(egui::RichText::new("DEL").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
-                                    to_remove = Some(idx);
-                                }
-                            });
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    if ui
+                                        .small_button(
+                                            egui::RichText::new("DEL")
+                                                .color(egui::Color32::from_rgb(255, 100, 100)),
+                                        )
+                                        .clicked()
+                                    {
+                                        to_remove = Some(idx);
+                                    }
+                                },
+                            );
                         });
 
                         ui.add_space(6.0);
 
                         // Config Fields
                         match macro_action {
-                            MacroAction::Click { coordinate, button, click_method, use_mouse_movement: _ } => {
+                            MacroAction::Click {
+                                coordinate,
+                                button,
+                                click_method,
+                                use_mouse_movement: _,
+                            } => {
                                 ui.horizontal(|ui| {
                                     ui.label("Position:");
                                     if let Some((x, y)) = coordinate {
-                                        ui.label(egui::RichText::new(format!("({}, {})", x, y)).monospace().strong());
+                                        ui.label(
+                                            egui::RichText::new(format!("({}, {})", x, y))
+                                                .monospace()
+                                                .strong(),
+                                        );
                                     } else {
-                                        ui.colored_label(egui::Color32::from_rgb(255, 100, 100), "Not set");
+                                        ui.colored_label(
+                                            egui::Color32::from_rgb(255, 100, 100),
+                                            "Not set",
+                                        );
                                     }
 
-                                    let is_this_calibrating = click_calibrating_action_index == Some(idx);
+                                    let is_this_calibrating =
+                                        click_calibrating_action_index == Some(idx);
                                     if is_this_calibrating {
-                                        if ui.button(egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
+                                        if ui
+                                            .button(
+                                                egui::RichText::new("Stop")
+                                                    .color(egui::Color32::from_rgb(255, 100, 100)),
+                                            )
+                                            .clicked()
+                                        {
                                             action = CustomMacroUiAction::CancelCalibration;
                                         }
-                                        ui.label(egui::RichText::new("Click on game...").color(egui::Color32::YELLOW));
+                                        ui.label(
+                                            egui::RichText::new("Click on game...")
+                                                .color(egui::Color32::YELLOW),
+                                        );
                                     } else {
                                         if ui.button("Set").clicked() {
-                                             action = CustomMacroUiAction::StartCalibration(idx);
+                                            action = CustomMacroUiAction::StartCalibration(idx);
                                         }
-                                        if coordinate.is_some() && ui.button("Clear").on_hover_text("Clear Position").clicked() {
+                                        if coordinate.is_some()
+                                            && ui
+                                                .button("Clear")
+                                                .on_hover_text("Clear Position")
+                                                .clicked()
+                                        {
                                             *coordinate = None;
                                         }
                                     }
@@ -186,31 +240,43 @@ pub fn render_ui(
 
                                 ui.horizontal(|ui| {
                                     ui.label("Method:");
-                                    ui.radio_value(click_method, crate::settings::ClickMethod::SendMessage, "Direct")
-                                        .on_hover_text("SendMessage - Default, reliable for most apps");
-                                    ui.radio_value(click_method, crate::settings::ClickMethod::PostMessage, "Async")
-                                        .on_hover_text("PostMessage - Asynchronous, may work where Direct fails");
-                                    ui.radio_value(click_method, crate::settings::ClickMethod::MouseMovement, "Move")
-                                        .on_hover_text("Mouse Movement - Physically moves cursor");
+                                    ui.radio_value(
+                                        click_method,
+                                        crate::settings::ClickMethod::SendMessage,
+                                        "Direct",
+                                    )
+                                    .on_hover_text("SendMessage - Default, reliable for most apps");
+                                    ui.radio_value(
+                                        click_method,
+                                        crate::settings::ClickMethod::MouseMovement,
+                                        "Move",
+                                    )
+                                    .on_hover_text("Mouse Movement - Physically moves cursor");
                                 });
-                            },
+                            }
                             MacroAction::TypeText { text } => {
                                 ui.horizontal(|ui| {
                                     ui.label("Text:");
                                     ui.text_edit_singleline(text);
                                 });
-                            },
+                            }
                             MacroAction::Delay { milliseconds } => {
                                 ui.horizontal(|ui| {
                                     ui.label("Duration (ms):");
                                     let mut ms_str = milliseconds.to_string();
-                                    if ui.text_edit_singleline(&mut ms_str).changed() {
+                                    if ui
+                                        .add(
+                                            egui::TextEdit::singleline(&mut ms_str)
+                                                .desired_width(80.0),
+                                        )
+                                        .changed()
+                                    {
                                         if let Ok(val) = ms_str.parse() {
                                             *milliseconds = val;
                                         }
                                     }
                                 });
-                            },
+                            }
                             MacroAction::OcrSearch {
                                 ocr_region,
                                 scale_factor,
@@ -232,20 +298,40 @@ pub fn render_ui(
                                         if let Some((l, t, w, h)) = ocr_region {
                                             ui.monospace(format!("({}, {}, {}x{})", l, t, w, h));
                                         } else {
-                                            ui.colored_label(egui::Color32::from_rgb(255, 200, 100), "Not set");
+                                            ui.colored_label(
+                                                egui::Color32::from_rgb(255, 200, 100),
+                                                "Not set",
+                                            );
                                         }
 
-                                        let is_this_ocr_calibrating = ocr_calibrating_action_index == Some(idx);
+                                        let is_this_ocr_calibrating =
+                                            ocr_calibrating_action_index == Some(idx);
                                         if is_this_ocr_calibrating {
-                                            if ui.button(egui::RichText::new("Stop").color(egui::Color32::RED)).clicked() {
-                                                action = CustomMacroUiAction::CancelOcrRegionCalibration;
+                                            if ui
+                                                .button(
+                                                    egui::RichText::new("Stop")
+                                                        .color(egui::Color32::RED),
+                                                )
+                                                .clicked()
+                                            {
+                                                action =
+                                                    CustomMacroUiAction::CancelOcrRegionCalibration;
                                             }
-                                            ui.label(egui::RichText::new("Click top-left, then bottom-right").color(egui::Color32::YELLOW));
+                                            ui.label(
+                                                egui::RichText::new(
+                                                    "Click top-left, then bottom-right",
+                                                )
+                                                .color(egui::Color32::YELLOW),
+                                            );
                                         } else {
                                             if ui.button("Set Region").clicked() {
-                                                action = CustomMacroUiAction::StartOcrRegionCalibration(idx);
+                                                action =
+                                                    CustomMacroUiAction::StartOcrRegionCalibration(
+                                                        idx,
+                                                    );
                                             }
-                                            if ocr_region.is_some() && ui.button("Clear").clicked() {
+                                            if ocr_region.is_some() && ui.button("Clear").clicked()
+                                            {
                                                 *ocr_region = None;
                                             }
                                         }
@@ -255,14 +341,20 @@ pub fn render_ui(
 
                                     ui.horizontal(|ui| {
                                         ui.label("Scale:");
-                                        egui::ComboBox::from_id_source(format!("ocr_scale_{}", idx))
-                                            .selected_text(format!("{}x", *scale_factor))
-                                            .show_ui(ui, |ui| {
+                                        egui::ComboBox::from_id_source(format!(
+                                            "ocr_scale_{}",
+                                            idx
+                                        ))
+                                        .selected_text(format!("{}x", *scale_factor))
+                                        .show_ui(
+                                            ui,
+                                            |ui| {
                                                 ui.selectable_value(scale_factor, 1, "1x");
                                                 ui.selectable_value(scale_factor, 2, "2x");
                                                 ui.selectable_value(scale_factor, 3, "3x");
                                                 ui.selectable_value(scale_factor, 4, "4x");
-                                            });
+                                            },
+                                        );
 
                                         ui.checkbox(invert_colors, "Invert");
                                         ui.checkbox(grayscale, "Grayscale");
@@ -272,21 +364,36 @@ pub fn render_ui(
 
                                     ui.horizontal(|ui| {
                                         ui.label("Decode:");
-                                        egui::ComboBox::from_id_source(format!("ocr_decode_mode_{}", idx))
-                                            .selected_text(match decode_mode {
-                                                OcrDecodeMode::Greedy => "Greedy (fast)",
-                                                OcrDecodeMode::BeamSearch => "Beam Search",
-                                            })
-                                            .show_ui(ui, |ui| {
-                                                ui.selectable_value(decode_mode, OcrDecodeMode::Greedy, "Greedy (fast)");
-                                                ui.selectable_value(decode_mode, OcrDecodeMode::BeamSearch, "Beam Search");
-                                            });
+                                        egui::ComboBox::from_id_source(format!(
+                                            "ocr_decode_mode_{}",
+                                            idx
+                                        ))
+                                        .selected_text(match decode_mode {
+                                            OcrDecodeMode::Greedy => "Greedy (fast)",
+                                            OcrDecodeMode::BeamSearch => "Beam Search",
+                                        })
+                                        .show_ui(
+                                            ui,
+                                            |ui| {
+                                                ui.selectable_value(
+                                                    decode_mode,
+                                                    OcrDecodeMode::Greedy,
+                                                    "Greedy (fast)",
+                                                );
+                                                ui.selectable_value(
+                                                    decode_mode,
+                                                    OcrDecodeMode::BeamSearch,
+                                                    "Beam Search",
+                                                );
+                                            },
+                                        );
 
                                         if matches!(decode_mode, OcrDecodeMode::BeamSearch) {
                                             ui.label("Beam width:");
-                                            ui.add(
+                                            ui.add_sized(
+                                                egui::vec2(80.0, 0.0),
                                                 egui::DragValue::new(beam_width)
-                                                    .clamp_range(2..=64)
+                                                    .clamp_range(2..=64),
                                             );
                                         }
                                     });
@@ -298,7 +405,13 @@ pub fn render_ui(
                                         ui.text_edit_singleline(target_stat);
                                         ui.label("Value:");
                                         let mut val_str = target_value.to_string();
-                                        if ui.text_edit_singleline(&mut val_str).changed() {
+                                        if ui
+                                            .add(
+                                                egui::TextEdit::singleline(&mut val_str)
+                                                    .desired_width(80.0),
+                                            )
+                                            .changed()
+                                        {
                                             if let Ok(v) = val_str.parse() {
                                                 *target_value = v;
                                             }
@@ -312,7 +425,13 @@ pub fn render_ui(
                                             ui.text_edit_singleline(alt_target_stat);
                                             ui.label("Value:");
                                             let mut val_str = alt_target_value.to_string();
-                                            if ui.text_edit_singleline(&mut val_str).changed() {
+                                            if ui
+                                                .add(
+                                                    egui::TextEdit::singleline(&mut val_str)
+                                                        .desired_width(80.0),
+                                                )
+                                                .changed()
+                                            {
                                                 if let Ok(v) = val_str.parse() {
                                                     *alt_target_value = v;
                                                 }
@@ -329,28 +448,58 @@ pub fn render_ui(
                                                 ComparisonMode::LessThanOrEqual => "≤",
                                             })
                                             .show_ui(ui, |ui| {
-                                                ui.selectable_value(comparison, ComparisonMode::Equals, "Equal (==)");
-                                                ui.selectable_value(comparison, ComparisonMode::GreaterThanOrEqual, "≥");
-                                                ui.selectable_value(comparison, ComparisonMode::LessThanOrEqual, "≤");
+                                                ui.selectable_value(
+                                                    comparison,
+                                                    ComparisonMode::Equals,
+                                                    "Equal (==)",
+                                                );
+                                                ui.selectable_value(
+                                                    comparison,
+                                                    ComparisonMode::GreaterThanOrEqual,
+                                                    "≥",
+                                                );
+                                                ui.selectable_value(
+                                                    comparison,
+                                                    ComparisonMode::LessThanOrEqual,
+                                                    "≤",
+                                                );
                                             });
                                     });
 
                                     ui.horizontal(|ui| {
                                         ui.label("Name match:");
-                                        egui::ComboBox::from_id_source(format!("ocr_name_match_{}", idx))
-                                            .selected_text(match name_match_mode {
-                                                OcrNameMatchMode::Exact => "Exact name",
-                                                OcrNameMatchMode::Contains => "Contains text",
-                                            })
-                                            .show_ui(ui, |ui| {
-                                                ui.selectable_value(name_match_mode, OcrNameMatchMode::Exact, "Exact name");
-                                                ui.selectable_value(name_match_mode, OcrNameMatchMode::Contains, "Contains text");
-                                            });
+                                        egui::ComboBox::from_id_source(format!(
+                                            "ocr_name_match_{}",
+                                            idx
+                                        ))
+                                        .selected_text(match name_match_mode {
+                                            OcrNameMatchMode::Exact => "Exact name",
+                                            OcrNameMatchMode::Contains => "Contains text",
+                                        })
+                                        .show_ui(
+                                            ui,
+                                            |ui| {
+                                                ui.selectable_value(
+                                                    name_match_mode,
+                                                    OcrNameMatchMode::Exact,
+                                                    "Exact name",
+                                                );
+                                                ui.selectable_value(
+                                                    name_match_mode,
+                                                    OcrNameMatchMode::Contains,
+                                                    "Contains text",
+                                                );
+                                            },
+                                        );
                                     });
 
-                                    ui.label(egui::RichText::new("If match is found, macro stops.").size(11.0).italics());
+                                    ui.label(
+                                        egui::RichText::new("If match is found, macro stops.")
+                                            .size(11.0)
+                                            .italics(),
+                                    );
                                 });
-                            },
+                            }
                         }
                     });
                 });
@@ -377,30 +526,36 @@ pub fn render_ui(
         ui.add_space(4.0);
 
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("Don't forget to add delays between actions!")
-                .color(egui::Color32::from_rgb(255, 200, 100)).size(12.0));
+            ui.label(
+                egui::RichText::new("Don't forget to add delays between actions!")
+                    .color(egui::Color32::from_rgb(255, 200, 100))
+                    .size(12.0),
+            );
         });
 
         ui.add_space(8.0);
 
         ui.horizontal(|ui| {
-             ui.checkbox(&mut named_macro.settings.loop_enabled, "Enable Loop");
+            ui.checkbox(&mut named_macro.settings.loop_enabled, "Enable Loop");
 
-             if named_macro.settings.loop_enabled {
+            if named_macro.settings.loop_enabled {
                 ui.separator();
                 ui.checkbox(&mut named_macro.settings.infinite_loop, "Infinite");
 
                 if !named_macro.settings.infinite_loop {
                     ui.label("Repeat:");
                     let mut count_str = named_macro.settings.loop_count.to_string();
-                    if ui.text_edit_singleline(&mut count_str).changed() {
+                    if ui
+                        .add(egui::TextEdit::singleline(&mut count_str).desired_width(80.0))
+                        .changed()
+                    {
                         if let Ok(val) = count_str.parse::<u32>() {
                             named_macro.settings.loop_count = val.max(1);
                         }
                     }
                     ui.label("times");
                 }
-             }
+            }
         });
     });
 

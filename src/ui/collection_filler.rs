@@ -1,6 +1,6 @@
-use eframe::egui;
-use crate::settings::CollectionFillerSettings;
 use crate::calibration::{CalibrationManager, CalibrationResult};
+use crate::settings::CollectionFillerSettings;
+use eframe::egui;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CalibrationItem {
@@ -42,7 +42,10 @@ pub fn render_ui(
     let mut action = UiAction::None;
 
     if !game_connected {
-        ui.colored_label(egui::Color32::RED, "Please connect to game first (top right)");
+        ui.colored_label(
+            egui::Color32::RED,
+            "Please connect to game first (top right)",
+        );
         return UiAction::None;
     }
 
@@ -78,8 +81,13 @@ pub fn render_ui(
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new("Delay (ms):").strong());
             let mut delay = settings.delay_ms.to_string();
-            if ui.text_edit_singleline(&mut delay).changed() {
-                if let Ok(v) = delay.parse() { settings.delay_ms = v; }
+            if ui
+                .add(egui::TextEdit::singleline(&mut delay).desired_width(80.0))
+                .changed()
+            {
+                if let Ok(v) = delay.parse() {
+                    settings.delay_ms = v;
+                }
             }
         });
 
@@ -87,7 +95,10 @@ pub fn render_ui(
 
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new("Red Dot Tolerance:").strong());
-            ui.add(egui::Slider::new(&mut settings.red_dot_tolerance, 0.01..=0.99));
+            ui.add(egui::Slider::new(
+                &mut settings.red_dot_tolerance,
+                0.01..=0.99,
+            ));
         });
     });
 
@@ -101,32 +112,112 @@ pub fn render_ui(
         ui.label(egui::RichText::new("Detection Areas:").strong().underline());
         ui.add_space(4.0);
 
-        if let Some(act) = render_area_calibration(ui, "Tabs Area", CalibrationItem::CollectionTabsArea,
-            settings.collection_tabs_area, calibrating_item, calibration) { action = act; }
-        if let Some(act) = render_area_calibration(ui, "Dungeon List", CalibrationItem::DungeonListArea,
-            settings.dungeon_list_area, calibrating_item, calibration) { action = act; }
-        if let Some(act) = render_area_calibration(ui, "Items Area", CalibrationItem::CollectionItemsArea,
-            settings.collection_items_area, calibrating_item, calibration) { action = act; }
+        if let Some(act) = render_area_calibration(
+            ui,
+            "Tabs Area",
+            CalibrationItem::CollectionTabsArea,
+            settings.collection_tabs_area,
+            calibrating_item,
+            calibration,
+        ) {
+            action = act;
+        }
+        if let Some(act) = render_area_calibration(
+            ui,
+            "Dungeon List",
+            CalibrationItem::DungeonListArea,
+            settings.dungeon_list_area,
+            calibrating_item,
+            calibration,
+        ) {
+            action = act;
+        }
+        if let Some(act) = render_area_calibration(
+            ui,
+            "Items Area",
+            CalibrationItem::CollectionItemsArea,
+            settings.collection_items_area,
+            calibrating_item,
+            calibration,
+        ) {
+            action = act;
+        }
 
         ui.add_space(8.0);
         ui.label(egui::RichText::new("Action Buttons:").strong().underline());
         ui.add_space(4.0);
 
-        if let Some(act) = render_button_calibration(ui, "Auto Refill", CalibrationItem::AutoRefillButton,
-            settings.auto_refill_pos, calibrating_item, calibration) { action = act; }
-        if let Some(act) = render_button_calibration(ui, "Register", CalibrationItem::RegisterButton,
-            settings.register_pos, calibrating_item, calibration) { action = act; }
-        if let Some(act) = render_button_calibration(ui, "Yes", CalibrationItem::YesButton,
-            settings.yes_pos, calibrating_item, calibration) { action = act; }
+        if let Some(act) = render_button_calibration(
+            ui,
+            "Auto Refill",
+            CalibrationItem::AutoRefillButton,
+            settings.auto_refill_pos,
+            calibrating_item,
+            calibration,
+        ) {
+            action = act;
+        }
+        if let Some(act) = render_button_calibration(
+            ui,
+            "Register",
+            CalibrationItem::RegisterButton,
+            settings.register_pos,
+            calibrating_item,
+            calibration,
+        ) {
+            action = act;
+        }
+        if let Some(act) = render_button_calibration(
+            ui,
+            "Yes",
+            CalibrationItem::YesButton,
+            settings.yes_pos,
+            calibrating_item,
+            calibration,
+        ) {
+            action = act;
+        }
         ui.separator();
-        if let Some(act) = render_button_calibration(ui, "Page 2", CalibrationItem::Page2Button,
-            settings.page_2_pos, calibrating_item, calibration) { action = act; }
-        if let Some(act) = render_button_calibration(ui, "Page 3", CalibrationItem::Page3Button,
-            settings.page_3_pos, calibrating_item, calibration) { action = act; }
-        if let Some(act) = render_button_calibration(ui, "Page 4", CalibrationItem::Page4Button,
-            settings.page_4_pos, calibrating_item, calibration) { action = act; }
-        if let Some(act) = render_button_calibration(ui, "Arrow Right", CalibrationItem::ArrowRightButton,
-            settings.arrow_right_pos, calibrating_item, calibration) { action = act; }
+        if let Some(act) = render_button_calibration(
+            ui,
+            "Page 2",
+            CalibrationItem::Page2Button,
+            settings.page_2_pos,
+            calibrating_item,
+            calibration,
+        ) {
+            action = act;
+        }
+        if let Some(act) = render_button_calibration(
+            ui,
+            "Page 3",
+            CalibrationItem::Page3Button,
+            settings.page_3_pos,
+            calibrating_item,
+            calibration,
+        ) {
+            action = act;
+        }
+        if let Some(act) = render_button_calibration(
+            ui,
+            "Page 4",
+            CalibrationItem::Page4Button,
+            settings.page_4_pos,
+            calibrating_item,
+            calibration,
+        ) {
+            action = act;
+        }
+        if let Some(act) = render_button_calibration(
+            ui,
+            "Arrow Right",
+            CalibrationItem::ArrowRightButton,
+            settings.arrow_right_pos,
+            calibrating_item,
+            calibration,
+        ) {
+            action = act;
+        }
     });
 
     ui.add_space(12.0);
@@ -186,19 +277,26 @@ fn render_area_calibration(
         ui.label(format!("{}:", label));
 
         if let Some((left, top, width, height)) = current {
-            ui.label(egui::RichText::new(format!("({}, {}, {}x{})", left, top, width, height))
-                .monospace()
-                .strong());
+            ui.label(
+                egui::RichText::new(format!("({}, {}, {}x{})", left, top, width, height))
+                    .monospace()
+                    .strong(),
+            );
         } else {
-            ui.label(egui::RichText::new("Not set")
-                .color(egui::Color32::from_rgb(150, 150, 150))
-                .italics());
+            ui.label(
+                egui::RichText::new("Not set")
+                    .color(egui::Color32::from_rgb(150, 150, 150))
+                    .italics(),
+            );
         }
 
         let is_this_calibrating = calibrating_item.as_ref() == Some(&item);
 
         if is_this_calibrating {
-            if ui.button(egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
+            if ui
+                .button(egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100)))
+                .clicked()
+            {
                 action = Some(UiAction::CancelCalibration);
             }
             let label = if calibration.is_waiting_for_second_click() {
@@ -232,19 +330,26 @@ fn render_button_calibration(
         ui.label(format!("{}:", label));
 
         if let Some((x, y)) = current {
-            ui.label(egui::RichText::new(format!("({}, {})", x, y))
-                .monospace()
-                .strong());
+            ui.label(
+                egui::RichText::new(format!("({}, {})", x, y))
+                    .monospace()
+                    .strong(),
+            );
         } else {
-            ui.label(egui::RichText::new("Not set")
-                .color(egui::Color32::from_rgb(150, 150, 150))
-                .italics());
+            ui.label(
+                egui::RichText::new("Not set")
+                    .color(egui::Color32::from_rgb(150, 150, 150))
+                    .italics(),
+            );
         }
 
         let is_this_calibrating = calibrating_item.as_ref() == Some(&item);
 
         if is_this_calibrating {
-            if ui.button(egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
+            if ui
+                .button(egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100)))
+                .clicked()
+            {
                 action = Some(UiAction::CancelCalibration);
             }
             ui.label(egui::RichText::new("Click Button...").color(egui::Color32::YELLOW));
@@ -267,27 +372,37 @@ pub fn apply_calibration_result(
     settings: &mut CollectionFillerSettings,
 ) {
     match (item, result) {
-        (CalibrationItem::CollectionTabsArea, CalibrationResult::Area(l, t, w, h)) =>
-            settings.collection_tabs_area = Some((l, t, w, h)),
-        (CalibrationItem::DungeonListArea, CalibrationResult::Area(l, t, w, h)) =>
-            settings.dungeon_list_area = Some((l, t, w, h)),
-        (CalibrationItem::CollectionItemsArea, CalibrationResult::Area(l, t, w, h)) =>
-            settings.collection_items_area = Some((l, t, w, h)),
+        (CalibrationItem::CollectionTabsArea, CalibrationResult::Area(l, t, w, h)) => {
+            settings.collection_tabs_area = Some((l, t, w, h))
+        }
+        (CalibrationItem::DungeonListArea, CalibrationResult::Area(l, t, w, h)) => {
+            settings.dungeon_list_area = Some((l, t, w, h))
+        }
+        (CalibrationItem::CollectionItemsArea, CalibrationResult::Area(l, t, w, h)) => {
+            settings.collection_items_area = Some((l, t, w, h))
+        }
 
-        (CalibrationItem::AutoRefillButton, CalibrationResult::Point(x, y)) =>
-            settings.auto_refill_pos = Some((x, y)),
-        (CalibrationItem::RegisterButton, CalibrationResult::Point(x, y)) =>
-            settings.register_pos = Some((x, y)),
-        (CalibrationItem::YesButton, CalibrationResult::Point(x, y)) =>
-            settings.yes_pos = Some((x, y)),
-        (CalibrationItem::Page2Button, CalibrationResult::Point(x, y)) =>
-            settings.page_2_pos = Some((x, y)),
-        (CalibrationItem::Page3Button, CalibrationResult::Point(x, y)) =>
-            settings.page_3_pos = Some((x, y)),
-        (CalibrationItem::Page4Button, CalibrationResult::Point(x, y)) =>
-            settings.page_4_pos = Some((x, y)),
-        (CalibrationItem::ArrowRightButton, CalibrationResult::Point(x, y)) =>
-            settings.arrow_right_pos = Some((x, y)),
+        (CalibrationItem::AutoRefillButton, CalibrationResult::Point(x, y)) => {
+            settings.auto_refill_pos = Some((x, y))
+        }
+        (CalibrationItem::RegisterButton, CalibrationResult::Point(x, y)) => {
+            settings.register_pos = Some((x, y))
+        }
+        (CalibrationItem::YesButton, CalibrationResult::Point(x, y)) => {
+            settings.yes_pos = Some((x, y))
+        }
+        (CalibrationItem::Page2Button, CalibrationResult::Point(x, y)) => {
+            settings.page_2_pos = Some((x, y))
+        }
+        (CalibrationItem::Page3Button, CalibrationResult::Point(x, y)) => {
+            settings.page_3_pos = Some((x, y))
+        }
+        (CalibrationItem::Page4Button, CalibrationResult::Point(x, y)) => {
+            settings.page_4_pos = Some((x, y))
+        }
+        (CalibrationItem::ArrowRightButton, CalibrationResult::Point(x, y)) => {
+            settings.arrow_right_pos = Some((x, y))
+        }
         _ => {}
     }
 }

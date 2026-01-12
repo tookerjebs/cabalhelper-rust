@@ -1,12 +1,14 @@
-use std::sync::{Arc, Mutex};
-use eframe::egui;
-use windows::Win32::Foundation::HWND;
-use crate::settings::{CustomMacroSettings, MacroAction, OcrDecodeMode, OcrNameMatchMode, ComparisonMode};
-use crate::tools::r#trait::Tool;
-use crate::calibration::{CalibrationManager, CalibrationResult};
 use crate::automation::interaction::delay_ms;
-use crate::ui::custom_macro::{CustomMacroUiAction, render_ui};
+use crate::calibration::{CalibrationManager, CalibrationResult};
 use crate::core::worker::Worker;
+use crate::settings::{
+    ComparisonMode, CustomMacroSettings, MacroAction, OcrDecodeMode, OcrNameMatchMode,
+};
+use crate::tools::r#trait::Tool;
+use crate::ui::custom_macro::{render_ui, CustomMacroUiAction};
+use eframe::egui;
+use std::sync::{Arc, Mutex};
+use windows::Win32::Foundation::HWND;
 
 pub struct CustomMacroTool {
     // Which macro profile this tool is managing
@@ -39,9 +41,9 @@ impl Tool for CustomMacroTool {
     fn stop(&mut self) {
         self.worker.stop();
         if self.worker.get_status().contains("Stopped") {
-             // Already stopped
+            // Already stopped
         } else {
-             self.worker.set_status("Stopped (ESC pressed)");
+            self.worker.set_status("Stopped (ESC pressed)");
         }
     }
 
@@ -64,11 +66,17 @@ impl Tool for CustomMacroTool {
                 self.worker.set_status("No actions configured");
             }
         } else {
-             self.worker.set_status("Connect to game first");
+            self.worker.set_status("Connect to game first");
         }
     }
 
-    fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut crate::settings::AppSettings, game_hwnd: Option<HWND>) {
+    fn update(
+        &mut self,
+        ctx: &egui::Context,
+        ui: &mut egui::Ui,
+        settings: &mut crate::settings::AppSettings,
+        game_hwnd: Option<HWND>,
+    ) {
         if self.macro_index >= settings.custom_macros.len() {
             ui.colored_label(egui::Color32::RED, "Error: Macro profile not found");
             return;
@@ -88,7 +96,8 @@ impl Tool for CustomMacroTool {
                         if let Some(action) = macro_settings.settings.actions.get_mut(idx) {
                             if let MacroAction::Click { coordinate, .. } = action {
                                 *coordinate = Some((x, y));
-                                self.worker.set_status(&format!("Click position set: ({}, {})", x, y));
+                                self.worker
+                                    .set_status(&format!("Click position set: ({}, {})", x, y));
                             }
                         }
                     }
@@ -108,11 +117,11 @@ impl Tool for CustomMacroTool {
                 }
             }
         } else {
-             // If disconnected, ensure we aren't running
-             if self.worker.is_running() {
-                 self.worker.stop();
-                 self.worker.set_status("Disconnected");
-             }
+            // If disconnected, ensure we aren't running
+            if self.worker.is_running() {
+                self.worker.stop();
+                self.worker.set_status("Disconnected");
+            }
         }
 
         if self.calibration.is_active() || self.ocr_region_calibration.is_active() {
@@ -132,30 +141,31 @@ impl Tool for CustomMacroTool {
             is_running,
             &status,
             game_hwnd.is_some(),
-            can_delete
+            can_delete,
         );
 
         match action {
             CustomMacroUiAction::StartCalibration(action_index) => {
                 self.calibrating_action_index = Some(action_index);
                 self.calibration.start_point();
-                self.worker.set_status("Click on the game window to set coordinates");
-            },
+                self.worker
+                    .set_status("Click on the game window to set coordinates");
+            }
             CustomMacroUiAction::CancelCalibration => {
                 self.calibration.cancel();
                 self.calibrating_action_index = None;
                 self.worker.set_status("Cancelled");
-            },
+            }
             CustomMacroUiAction::StartOcrRegionCalibration(action_index) => {
                 self.ocr_calibrating_action_index = Some(action_index);
                 self.ocr_region_calibration.start_area();
                 self.worker.set_status("Click top-left, then bottom-right");
-            },
+            }
             CustomMacroUiAction::CancelOcrRegionCalibration => {
                 self.ocr_region_calibration.cancel();
                 self.ocr_calibrating_action_index = None;
                 self.worker.set_status("OCR region calibration cancelled");
-            },
+            }
             CustomMacroUiAction::StartMacro => {
                 if game_hwnd.is_none() {
                     self.worker.set_status("Connect to game first");
@@ -164,18 +174,20 @@ impl Tool for CustomMacroTool {
                 } else {
                     self.start_macro(macro_settings.settings.clone(), game_hwnd.unwrap());
                 }
-            },
+            }
             CustomMacroUiAction::StopMacro => {
                 self.stop();
-            },
+            }
             CustomMacroUiAction::DeleteMacro => {
                 // Delete this macro from settings
-                if settings.custom_macros.len() > 1 && self.macro_index < settings.custom_macros.len() {
+                if settings.custom_macros.len() > 1
+                    && self.macro_index < settings.custom_macros.len()
+                {
                     settings.custom_macros.remove(self.macro_index);
                     settings.auto_save();
                     // Note: app.rs needs to rebuild tools after this frame
                 }
-            },
+            }
             CustomMacroUiAction::None => {}
         }
     }
@@ -317,17 +329,6 @@ impl CustomMacroTool {
                                         } else {
                                             use crate::core::input::right_click_at_position;
                                             right_click_at_position(game_hwnd, *x, *y);
-                                        }
-                                    },
-                                    crate::settings::ClickMethod::PostMessage => {
-                                        // Async click without mouse movement
-                                        let is_left = matches!(button, crate::settings::MouseButton::Left);
-                                        if is_left {
-                                            use crate::core::input::click_at_position_post;
-                                            click_at_position_post(game_hwnd, *x, *y);
-                                        } else {
-                                            use crate::core::input::right_click_at_position_post;
-                                            right_click_at_position_post(game_hwnd, *x, *y);
                                         }
                                     },
                                     crate::settings::ClickMethod::MouseMovement => {

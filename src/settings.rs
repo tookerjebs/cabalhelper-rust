@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fs;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,13 +105,12 @@ impl Default for AcceptItemSettings {
     fn default() -> Self {
         Self {
             image_path: "image.png".to_string(),
-            interval_ms: 100,  // Reduced from 1000ms for faster detection
+            interval_ms: 100, // Reduced from 1000ms for faster detection
             tolerance: 0.85,
             search_region: None,
         }
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
 pub enum ComparisonMode {
@@ -126,9 +125,15 @@ impl Default for ComparisonMode {
     }
 }
 
-fn default_scale_factor() -> u32 { 2 }
-fn default_true() -> bool { true }
-fn default_beam_width() -> u32 { 10 }
+fn default_scale_factor() -> u32 {
+    2
+}
+fn default_true() -> bool {
+    true
+}
+fn default_beam_width() -> u32 {
+    10
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
 pub enum OcrDecodeMode {
@@ -153,7 +158,6 @@ impl Default for OcrNameMatchMode {
         OcrNameMatchMode::Exact
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NamedMacro {
@@ -223,7 +227,6 @@ pub enum MacroAction {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
 pub enum ClickMethod {
     SendMessage,   // Direct click (current default)
-    PostMessage,   // Async click
     MouseMovement, // Physical mouse movement
 }
 
@@ -281,15 +284,11 @@ impl AppSettings {
                             settings.custom_macros.push(NamedMacro::default());
                         }
                         settings
-                    },
-                    Err(_) => {
-                        Self::default()
                     }
+                    Err(_) => Self::default(),
                 }
-            },
-            Err(_) => {
-                Self::default()
             }
+            Err(_) => Self::default(),
         }
     }
 
@@ -298,8 +297,7 @@ impl AppSettings {
         let json = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize: {}", e))?;
 
-        fs::write(Self::SETTINGS_FILE, json)
-            .map_err(|e| format!("Failed to write file: {}", e))?;
+        fs::write(Self::SETTINGS_FILE, json).map_err(|e| format!("Failed to write file: {}", e))?;
 
         Ok(())
     }

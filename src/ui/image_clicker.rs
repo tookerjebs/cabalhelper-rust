@@ -26,7 +26,10 @@ pub fn render_ui(
     let mut action = ImageUiAction::None;
 
     if !game_connected {
-        ui.colored_label(egui::Color32::RED, "Please connect to game first (top right)");
+        ui.colored_label(
+            egui::Color32::RED,
+            "Please connect to game first (top right)",
+        );
         return ImageUiAction::None;
     }
 
@@ -56,7 +59,7 @@ pub fn render_ui(
 
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new("Interval (ms):").strong());
-            ui.text_edit_singleline(interval_ms);
+            ui.add(egui::TextEdit::singleline(interval_ms).desired_width(80.0));
         });
 
         ui.add_space(4.0);
@@ -74,26 +77,39 @@ pub fn render_ui(
         ui.heading(egui::RichText::new("Detection Area").size(14.0).strong());
         ui.add_space(4.0);
 
-        ui.label(egui::RichText::new("Optional: Improve performance by limiting search area.").small().color(egui::Color32::GRAY));
+        ui.label(
+            egui::RichText::new("Optional: Improve performance by limiting search area.")
+                .small()
+                .color(egui::Color32::GRAY),
+        );
         ui.add_space(4.0);
 
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new("Region:").strong());
 
             if let Some((left, top, width, height)) = search_region {
-                ui.label(egui::RichText::new(format!("({}, {}, {}x{})", left, top, width, height))
-                    .monospace()
-                    .strong());
+                ui.label(
+                    egui::RichText::new(format!("({}, {}, {}x{})", left, top, width, height))
+                        .monospace()
+                        .strong(),
+                );
             } else {
-                ui.label(egui::RichText::new("Not set (Full Screen)")
-                    .color(egui::Color32::YELLOW)
-                    .italics());
+                ui.label(
+                    egui::RichText::new("Not set (Full Screen)")
+                        .color(egui::Color32::YELLOW)
+                        .italics(),
+                );
             }
 
             ui.separator();
 
             if is_calibrating {
-                if ui.button(egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100))).clicked() {
+                if ui
+                    .button(
+                        egui::RichText::new("Stop").color(egui::Color32::from_rgb(255, 100, 100)),
+                    )
+                    .clicked()
+                {
                     action = ImageUiAction::CancelCalibration;
                 }
                 let label = if is_waiting_for_second_click {
@@ -106,7 +122,9 @@ pub fn render_ui(
                 if ui.button("Set Region").clicked() {
                     action = ImageUiAction::StartRegionCalibration;
                 }
-                if search_region.is_some() && ui.button("Clear").on_hover_text("Clear Region").clicked() {
+                if search_region.is_some()
+                    && ui.button("Clear").on_hover_text("Clear Region").clicked()
+                {
                     action = ImageUiAction::ClearRegion;
                 }
             }
@@ -120,7 +138,10 @@ pub fn render_ui(
         let (btn_text, btn_color) = if is_running {
             ("Stop Image Clicker", egui::Color32::from_rgb(255, 100, 100))
         } else {
-            ("Start Image Clicker", egui::Color32::from_rgb(100, 255, 100))
+            (
+                "Start Image Clicker",
+                egui::Color32::from_rgb(100, 255, 100),
+            )
         };
 
         let button = egui::Button::new(egui::RichText::new(btn_text).size(16.0).color(btn_color))

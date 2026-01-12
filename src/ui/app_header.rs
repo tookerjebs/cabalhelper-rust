@@ -5,9 +5,9 @@ use windows::Win32::Foundation::HWND;
 pub enum HeaderAction {
     Connect(HWND),
     Disconnect,
-    Save,
     ToggleLog,
     ToggleOverlay,
+    Help,
     None,
 }
 
@@ -50,14 +50,14 @@ pub fn render_header(
         // --- Right Side: All Buttons ---
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
             ui.spacing_mut().item_spacing = egui::vec2(6.0, 0.0);
-            let button_size = egui::vec2(90.0, 28.0);
-            let compact_size = egui::vec2(72.0, 28.0);
+            let button_size = egui::vec2(66.0, 26.0);
+            let compact_size = egui::vec2(66.0, 26.0);
 
             if ui
-                .add_sized(button_size, egui::Button::new("Save"))
+                .add_sized(button_size, egui::Button::new("?"))
                 .clicked()
             {
-                action = HeaderAction::Save;
+                action = HeaderAction::Help;
             }
 
             if ui
