@@ -40,14 +40,6 @@ pub fn right_click_at_position(hwnd: HWND, x: i32, y: i32) -> bool {
     }
 }
 
-/// Check if left mouse button was pressed since last call
-pub fn was_left_mouse_pressed() -> bool {
-    unsafe {
-        let key_state = GetAsyncKeyState(0x01); // VK_LBUTTON
-        (key_state as u16) & 0x0001 != 0
-    }
-}
-
 /// Check if left mouse button is currently down
 pub fn is_left_mouse_down() -> bool {
     unsafe {

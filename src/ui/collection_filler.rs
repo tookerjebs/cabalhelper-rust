@@ -271,7 +271,7 @@ fn render_area_calibration(
     ui: &mut egui::Ui,
     label: &str,
     item: CalibrationItem,
-    current: Option<(i32, i32, i32, i32)>,
+    current: Option<(f32, f32, f32, f32)>,
     calibrating_item: &Option<CalibrationItem>,
     calibration: &CalibrationManager,
 ) -> Option<UiAction> {
@@ -281,9 +281,12 @@ fn render_area_calibration(
 
         if let Some((left, top, width, height)) = current {
             ui.label(
-                egui::RichText::new(format!("({}, {}, {}x{})", left, top, width, height))
-                    .monospace()
-                    .strong(),
+                egui::RichText::new(format!(
+                    "({:.3}, {:.3}, {:.3}x{:.3})",
+                    left, top, width, height
+                ))
+                .monospace()
+                .strong(),
             );
         } else {
             ui.label(
@@ -324,7 +327,7 @@ fn render_button_calibration(
     ui: &mut egui::Ui,
     label: &str,
     item: CalibrationItem,
-    current: Option<(i32, i32)>,
+    current: Option<(f32, f32)>,
     calibrating_item: &Option<CalibrationItem>,
     _calibration: &CalibrationManager,
 ) -> Option<UiAction> {
@@ -334,7 +337,7 @@ fn render_button_calibration(
 
         if let Some((x, y)) = current {
             ui.label(
-                egui::RichText::new(format!("({}, {})", x, y))
+                egui::RichText::new(format!("({:.3}, {:.3})", x, y))
                     .monospace()
                     .strong(),
             );

@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 
+pub type NormPoint = (f32, f32);
+pub type NormRect = (f32, f32, f32, f32);
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     #[serde(default)]
@@ -25,19 +28,19 @@ impl Default for AppSettings {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CollectionFillerSettings {
-    // Detection Areas (stored as (left, top, width, height) relative to game window)
-    pub collection_tabs_area: Option<(i32, i32, i32, i32)>,
-    pub dungeon_list_area: Option<(i32, i32, i32, i32)>,
-    pub collection_items_area: Option<(i32, i32, i32, i32)>,
+    // Detection Areas (stored as normalized (x, y, w, h) relative to client size)
+    pub collection_tabs_area: Option<NormRect>,
+    pub dungeon_list_area: Option<NormRect>,
+    pub collection_items_area: Option<NormRect>,
 
-    // Button Coordinates (x, y relative to game window)
-    pub auto_refill_pos: Option<(i32, i32)>,
-    pub register_pos: Option<(i32, i32)>,
-    pub yes_pos: Option<(i32, i32)>,
-    pub page_2_pos: Option<(i32, i32)>,
-    pub page_3_pos: Option<(i32, i32)>,
-    pub page_4_pos: Option<(i32, i32)>,
-    pub arrow_right_pos: Option<(i32, i32)>,
+    // Button Coordinates (normalized x, y relative to client size)
+    pub auto_refill_pos: Option<NormPoint>,
+    pub register_pos: Option<NormPoint>,
+    pub yes_pos: Option<NormPoint>,
+    pub page_2_pos: Option<NormPoint>,
+    pub page_3_pos: Option<NormPoint>,
+    pub page_4_pos: Option<NormPoint>,
+    pub arrow_right_pos: Option<NormPoint>,
 
     // Speed and matching settings
     pub delay_ms: u64,
@@ -102,7 +105,7 @@ pub struct AcceptItemSettings {
     pub image_path: String,
     pub interval_ms: u64,
     pub tolerance: f32, // Treated as Minimum Confidence (0.0-1.0), default 0.85
-    pub search_region: Option<(i32, i32, i32, i32)>,
+    pub search_region: Option<NormRect>,
     #[serde(default = "default_true")]
     pub show_in_overlay: bool,
 }
@@ -193,7 +196,7 @@ impl Default for NamedMacro {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MacroAction {
     Click {
-        coordinate: Option<(i32, i32)>,
+        coordinate: Option<NormPoint>,
         button: MouseButton,
         #[serde(default)]
         click_method: ClickMethod,
@@ -206,7 +209,7 @@ pub enum MacroAction {
         milliseconds: u64,
     },
     OcrSearch {
-        ocr_region: Option<(i32, i32, i32, i32)>,
+        ocr_region: Option<NormRect>,
         #[serde(default = "default_scale_factor")]
         scale_factor: u32,
         #[serde(default)]

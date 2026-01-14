@@ -1,5 +1,6 @@
 use crate::automation::interaction::delay_ms;
 use crate::calibration::{CalibrationManager, CalibrationResult};
+use crate::core::coords::{denormalize_point, denormalize_rect};
 use crate::core::worker::Worker;
 use crate::settings::{
     ComparisonMode, CustomMacroSettings, MacroAction, OcrDecodeMode, OcrNameMatchMode,
@@ -8,7 +9,27 @@ use crate::tools::r#trait::Tool;
 use crate::ui::custom_macro::{render_ui, CustomMacroUiAction};
 use eframe::egui;
 use std::sync::{Arc, Mutex};
+use windows::core::PCWSTR;
 use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::WindowsAndMessaging::{
+    MessageBoxW, MB_ICONINFORMATION, MB_OK, MB_SETFOREGROUND, MB_TOPMOST,
+};
+
+fn show_success_message(stat: &str, value: i32) {
+    let title = "OCR Match Found";
+    let body = format!("Match found: {} {}", stat, value);
+    let title_w: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+    let body_w: Vec<u16> = body.encode_utf16().chain(std::iter::once(0)).collect();
+
+    unsafe {
+        MessageBoxW(
+            None,
+            PCWSTR(body_w.as_ptr()),
+            PCWSTR(title_w.as_ptr()),
+            MB_OK | MB_ICONINFORMATION | MB_TOPMOST | MB_SETFOREGROUND,
+        );
+    }
+}
 
 pub struct CustomMacroTool {
     // Which macro profile this tool is managing
@@ -96,8 +117,10 @@ impl Tool for CustomMacroTool {
                         if let Some(action) = macro_settings.settings.actions.get_mut(idx) {
                             if let MacroAction::Click { coordinate, .. } = action {
                                 *coordinate = Some((x, y));
-                                self.worker
-                                    .set_status(&format!("Click position set: ({}, {})", x, y));
+                                self.worker.set_status(&format!(
+                                    "Click position set: ({:.3}, {:.3})",
+                                    x, y
+                                ));
                             }
                         }
                     }
@@ -207,6 +230,7 @@ impl CustomMacroTool {
             use crate::automation::context::AutomationContext;
             use crate::core::screen_capture::capture_region;
             use crate::core::ocr_parser::{parse_ocr_result, matches_target};
+            use crate::core::window::client_to_screen_coords;
             use ocrs::{OcrEngine, OcrEngineParams, ImageSource, DecodeMethod};
 
             let mut ctx = match AutomationContext::new(game_hwnd) {
@@ -314,32 +338,46 @@ impl CustomMacroTool {
                     match action {
                         MacroAction::Click { coordinate, button, click_method, use_mouse_movement: _ } => {
                             if let Some((x, y)) = coordinate {
+                                let (client_x, client_y) = match denormalize_point(game_hwnd, *x, *y) {
+                                    Some(pos) => pos,
+                                    None => {
+                                        *status.lock().unwrap() = "Invalid click position".to_string();
+                                        continue;
+                                    }
+                                };
                                 let btn_text = match button {
                                     crate::settings::MouseButton::Left => "Left",
                                     crate::settings::MouseButton::Right => "Right",
                                 };
-                                *status.lock().unwrap() = format!("{} Clicking at ({}, {})", btn_text, x, y);
+                                *status.lock().unwrap() = format!("{} Clicking at ({}, {})", btn_text, client_x, client_y);
 
                                 match click_method {
                                     crate::settings::ClickMethod::SendMessage => {
                                         // Direct click without mouse movement (default)
                                         let is_left = matches!(button, crate::settings::MouseButton::Left);
                                         if is_left {
-                                            click_at_position(game_hwnd, *x, *y);
+                                            click_at_position(game_hwnd, client_x, client_y);
                                         } else {
                                             use crate::core::input::right_click_at_position;
-                                            right_click_at_position(game_hwnd, *x, *y);
+                                            right_click_at_position(game_hwnd, client_x, client_y);
                                         }
                                     },
                                     crate::settings::ClickMethod::MouseMovement => {
                                         // Use screen coordinates with mouse movement
+                                        let (screen_x, screen_y) = match client_to_screen_coords(game_hwnd, client_x, client_y) {
+                                            Some(pos) => pos,
+                                            None => {
+                                                *status.lock().unwrap() = "Failed to convert to screen coords".to_string();
+                                                continue;
+                                            }
+                                        };
                                         let is_left = matches!(button, crate::settings::MouseButton::Left);
                                         if is_left {
                                             use crate::automation::interaction::click_at_screen;
-                                            click_at_screen(&mut ctx.gui, *x as u32, *y as u32);
+                                            click_at_screen(&mut ctx.gui, screen_x as u32, screen_y as u32);
                                         } else {
                                             use crate::automation::interaction::right_click_at_screen;
-                                            right_click_at_screen(&mut ctx.gui, *x as u32, *y as u32);
+                                            right_click_at_screen(&mut ctx.gui, screen_x as u32, screen_y as u32);
                                         }
                                     },
                                 }
@@ -378,7 +416,14 @@ impl CustomMacroTool {
                             }
 
                             let region = if let Some(region) = ocr_region {
-                                *region
+                                match denormalize_rect(game_hwnd, region.0, region.1, region.2, region.3) {
+                                    Some(rect) => rect,
+                                    None => {
+                                        *status.lock().unwrap() = format!("Action {}: Invalid OCR region", idx + 1);
+                                        *running.lock().unwrap() = false;
+                                        break;
+                                    }
+                                }
                             } else {
                                 *status.lock().unwrap() = format!("Action {}: OCR region not set", idx + 1);
                                 *running.lock().unwrap() = false;
@@ -478,6 +523,7 @@ impl CustomMacroTool {
                                                 if matched {
                                                     *status.lock().unwrap() =
                                                         format!("MATCH FOUND! {} {}", detected_stat, detected_value);
+                                                    show_success_message(&detected_stat, detected_value);
                                                     *running.lock().unwrap() = false;
                                                     break;
                                                 }

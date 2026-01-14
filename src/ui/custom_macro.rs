@@ -189,7 +189,7 @@ pub fn render_ui(
                                     ui.label("Position:");
                                     if let Some((x, y)) = coordinate {
                                         ui.label(
-                                            egui::RichText::new(format!("({}, {})", x, y))
+                                            egui::RichText::new(format!("({:.3}, {:.3})", x, y))
                                                 .monospace()
                                                 .strong(),
                                         );
@@ -297,7 +297,10 @@ pub fn render_ui(
                                     ui.horizontal(|ui| {
                                         ui.label("Region:");
                                         if let Some((l, t, w, h)) = ocr_region {
-                                            ui.monospace(format!("({}, {}, {}x{})", l, t, w, h));
+                                            ui.monospace(format!(
+                                                "({:.3}, {:.3}, {:.3}x{:.3})",
+                                                l, t, w, h
+                                            ));
                                         } else {
                                             ui.colored_label(
                                                 egui::Color32::from_rgb(255, 200, 100),

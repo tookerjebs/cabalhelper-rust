@@ -17,7 +17,7 @@ pub fn render_ui(
     interval_ms: &mut String,
     tolerance: &mut f32,
     show_in_overlay: &mut bool,
-    search_region: Option<(i32, i32, i32, i32)>,
+    search_region: Option<(f32, f32, f32, f32)>,
     is_calibrating: bool,
     is_waiting_for_second_click: bool,
     is_running: bool,
@@ -93,9 +93,12 @@ pub fn render_ui(
 
             if let Some((left, top, width, height)) = search_region {
                 ui.label(
-                    egui::RichText::new(format!("({}, {}, {}x{})", left, top, width, height))
-                        .monospace()
-                        .strong(),
+                    egui::RichText::new(format!(
+                        "({:.3}, {:.3}, {:.3}x{:.3})",
+                        left, top, width, height
+                    ))
+                    .monospace()
+                    .strong(),
                 );
             } else {
                 ui.label(

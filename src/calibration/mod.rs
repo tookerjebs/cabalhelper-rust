@@ -1,4 +1,5 @@
 // Calibration module - shared calibration logic for all tools
+use crate::core::coords::{normalize_point, normalize_rect};
 use crate::core::input::is_left_mouse_down;
 use crate::core::window::{
     get_client_rect_in_screen_coords, get_cursor_pos, get_window_under_cursor,
@@ -9,8 +10,8 @@ use windows::Win32::Foundation::HWND;
 /// Result of a calibration operation
 #[derive(Debug, Clone)]
 pub enum CalibrationResult {
-    Point(i32, i32),
-    Area(i32, i32, i32, i32), // left, top, width, height
+    Point(f32, f32),
+    Area(f32, f32, f32, f32), // left, top, width, height (normalized)
 }
 
 /// Manages calibration state and logic
@@ -123,7 +124,12 @@ impl CalibrationManager {
 
                     self.active = false;
                     self.area_start = None;
-                    return Some(CalibrationResult::Area(left, top, width, height));
+                    if let Some((nl, nt, nw, nh)) =
+                        normalize_rect(game_hwnd, left, top, width, height)
+                    {
+                        return Some(CalibrationResult::Area(nl, nt, nw, nh));
+                    }
+                    return None;
                 }
 
                 self.area_start = Some((x, y));
@@ -134,7 +140,9 @@ impl CalibrationManager {
 
         if let Some((x, y)) = cursor_in_game() {
             self.active = false;
-            return Some(CalibrationResult::Point(x, y));
+            if let Some((nx, ny)) = normalize_point(game_hwnd, x, y) {
+                return Some(CalibrationResult::Point(nx, ny));
+            }
         }
 
         None
