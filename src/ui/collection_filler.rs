@@ -100,6 +100,9 @@ pub fn render_ui(
                 0.01..=0.99,
             ));
         });
+
+        ui.add_space(4.0);
+        ui.checkbox(&mut settings.show_in_overlay, "Show in overlay");
     });
 
     ui.add_space(12.0);

@@ -53,6 +53,9 @@ pub struct CollectionFillerSettings {
     // Red dot image path
     #[serde(default = "default_red_dot_path")]
     pub red_dot_path: String,
+
+    #[serde(default = "default_true")]
+    pub show_in_overlay: bool,
 }
 
 impl Default for CollectionFillerSettings {
@@ -73,6 +76,7 @@ impl Default for CollectionFillerSettings {
             min_red: 150,
             red_dominance: 30,
             red_dot_path: "red-dot.png".to_string(),
+            show_in_overlay: true,
         }
     }
 }
@@ -99,6 +103,8 @@ pub struct AcceptItemSettings {
     pub interval_ms: u64,
     pub tolerance: f32, // Treated as Minimum Confidence (0.0-1.0), default 0.85
     pub search_region: Option<(i32, i32, i32, i32)>,
+    #[serde(default = "default_true")]
+    pub show_in_overlay: bool,
 }
 
 impl Default for AcceptItemSettings {
@@ -108,6 +114,7 @@ impl Default for AcceptItemSettings {
             interval_ms: 100, // Reduced from 1000ms for faster detection
             tolerance: 0.85,
             search_region: None,
+            show_in_overlay: true,
         }
     }
 }
@@ -162,6 +169,8 @@ impl Default for OcrNameMatchMode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NamedMacro {
     pub name: String,
+    #[serde(default = "default_true")]
+    pub show_in_overlay: bool,
     pub settings: CustomMacroSettings,
 }
 
@@ -169,6 +178,7 @@ impl NamedMacro {
     pub fn new(name: String) -> Self {
         Self {
             name,
+            show_in_overlay: true,
             settings: CustomMacroSettings::default(),
         }
     }

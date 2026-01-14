@@ -16,6 +16,7 @@ pub fn render_ui(
     image_path: &mut String,
     interval_ms: &mut String,
     tolerance: &mut f32,
+    show_in_overlay: &mut bool,
     search_region: Option<(i32, i32, i32, i32)>,
     is_calibrating: bool,
     is_waiting_for_second_click: bool,
@@ -68,6 +69,9 @@ pub fn render_ui(
             ui.label(egui::RichText::new("Confidence:").strong());
             ui.add(egui::Slider::new(tolerance, 0.01..=0.99));
         });
+
+        ui.add_space(4.0);
+        ui.checkbox(show_in_overlay, "Show in overlay");
     });
 
     ui.add_space(12.0);

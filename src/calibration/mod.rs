@@ -1,7 +1,10 @@
 // Calibration module - shared calibration logic for all tools
+use crate::core::input::is_left_mouse_down;
+use crate::core::window::{
+    get_client_rect_in_screen_coords, get_cursor_pos, get_window_under_cursor,
+    is_game_window_or_child, screen_to_window_coords,
+};
 use windows::Win32::Foundation::HWND;
-use crate::core::input::was_left_mouse_pressed;
-use crate::core::window::{get_window_under_cursor, is_game_window_or_child, get_cursor_pos, screen_to_window_coords};
 
 /// Result of a calibration operation
 #[derive(Debug, Clone)]
@@ -15,6 +18,7 @@ pub struct CalibrationManager {
     active: bool,
     is_area: bool, // true for area calibration, false for point
     area_start: Option<(i32, i32)>,
+    last_left_down: bool,
 }
 
 impl Default for CalibrationManager {
@@ -23,6 +27,7 @@ impl Default for CalibrationManager {
             active: false,
             is_area: false,
             area_start: None,
+            last_left_down: false,
         }
     }
 }
@@ -37,6 +42,7 @@ impl CalibrationManager {
         self.active = true;
         self.is_area = false;
         self.area_start = None;
+        self.last_left_down = false;
     }
 
     /// Start calibrating an area (click top-left, then bottom-right)
@@ -44,12 +50,14 @@ impl CalibrationManager {
         self.active = true;
         self.is_area = true;
         self.area_start = None;
+        self.last_left_down = false;
     }
 
     /// Cancel current calibration
     pub fn cancel(&mut self) {
         self.active = false;
         self.area_start = None;
+        self.last_left_down = false;
     }
 
     /// Check if calibration is active
@@ -65,7 +73,7 @@ impl CalibrationManager {
     /// Main update loop for calibration
     /// Handles mouse clicks and returns result if calibration finished this frame
     pub fn update(&mut self, game_hwnd: HWND) -> Option<CalibrationResult> {
-         self.handle_clicks(game_hwnd)
+        self.handle_clicks(game_hwnd)
     }
 
     /// Handle mouse clicks and return calibration result if complete
@@ -76,21 +84,36 @@ impl CalibrationManager {
         }
 
         let cursor_in_game = || -> Option<(i32, i32)> {
-            if let Some(cursor_hwnd) = get_window_under_cursor() {
-                if is_game_window_or_child(cursor_hwnd, game_hwnd) {
-                    if let Some((screen_x, screen_y)) = get_cursor_pos() {
-                        return screen_to_window_coords(game_hwnd, screen_x, screen_y);
-                    }
+            let (screen_x, screen_y) = get_cursor_pos()?;
+
+            if let Some((left, top, width, height)) = get_client_rect_in_screen_coords(game_hwnd) {
+                let right = left + width;
+                let bottom = top + height;
+                if screen_x >= left && screen_x < right && screen_y >= top && screen_y < bottom {
+                    return screen_to_window_coords(game_hwnd, screen_x, screen_y);
                 }
             }
+
+            if let Some(cursor_hwnd) = get_window_under_cursor() {
+                if is_game_window_or_child(cursor_hwnd, game_hwnd) {
+                    return screen_to_window_coords(game_hwnd, screen_x, screen_y);
+                }
+            }
+
             None
         };
 
-        if self.is_area {
-            if !was_left_mouse_pressed() {
-                return None;
-            }
+        let is_down = is_left_mouse_down();
+        if !is_down {
+            self.last_left_down = false;
+            return None;
+        }
+        if self.last_left_down {
+            return None;
+        }
+        self.last_left_down = true;
 
+        if self.is_area {
             if let Some((x, y)) = cursor_in_game() {
                 if let Some((x1, y1)) = self.area_start {
                     let left = x1.min(x);
@@ -106,10 +129,6 @@ impl CalibrationManager {
                 self.area_start = Some((x, y));
             }
 
-            return None;
-        }
-
-        if !was_left_mouse_pressed() {
             return None;
         }
 

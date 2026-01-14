@@ -103,6 +103,25 @@ impl CabalHelperApp {
                 .unwrap_or_else(|| "Image Clicker".to_string());
         }
     }
+
+    fn tool_visible_in_overlay(&self, idx: usize) -> bool {
+        match idx {
+            0 => self.settings.accept_item.show_in_overlay,
+            1 => self.settings.collection_filler.show_in_overlay,
+            _ => self
+                .settings
+                .custom_macros
+                .get(idx - 2)
+                .map(|macro_settings| macro_settings.show_in_overlay)
+                .unwrap_or(true),
+        }
+    }
+
+    fn overlay_tool_indices(&self) -> Vec<usize> {
+        (0..self.tools.len())
+            .filter(|idx| self.tool_visible_in_overlay(*idx))
+            .collect()
+    }
 }
 
 impl eframe::App for CabalHelperApp {
@@ -216,13 +235,15 @@ impl eframe::App for CabalHelperApp {
                 ui.allocate_ui_at_rect(response.rect, |ui| {
                     // Collect button states and actions first
                     let mut tool_to_toggle: Option<usize> = None;
+                    let overlay_indices = self.overlay_tool_indices();
 
                     // Horizontal layout - tight fit with borders
                     ui.horizontal(|ui| {
                         ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 0.0);
 
                         // Tool buttons with borders
-                        for (idx, tool) in self.tools.iter().enumerate() {
+                        for idx in overlay_indices {
+                            let tool = &self.tools[idx];
                             let is_running = tool.is_running();
                             let name = self.tool_names.get(idx).map(|n| n.as_str()).unwrap_or("");
                             let btn_text: String = name.chars().take(2).collect();
@@ -310,7 +331,7 @@ impl eframe::App for CabalHelperApp {
                         ));
 
                         // Dynamic overlay sizing
-                        let num_tools = self.tools.len();
+                        let num_tools = self.overlay_tool_indices().len();
                         let overlay_width = (num_tools as f32 * 36.0) + 24.0; // 36px per tool + 24px settings button
                         ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(
                             [overlay_width, 36.0].into(),

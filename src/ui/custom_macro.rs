@@ -41,6 +41,7 @@ pub fn render_ui(
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new("Macro Name:").strong());
             ui.text_edit_singleline(&mut named_macro.name);
+            ui.checkbox(&mut named_macro.show_in_overlay, "Show in overlay");
 
             if can_delete {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

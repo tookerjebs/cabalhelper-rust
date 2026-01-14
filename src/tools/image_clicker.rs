@@ -1,14 +1,14 @@
-use eframe::egui;
-use windows::Win32::Foundation::HWND;
-use crate::settings::AcceptItemSettings;
-use crate::tools::r#trait::Tool;
-use crate::calibration::{CalibrationManager, CalibrationResult};
 use crate::automation::context::AutomationContext;
 use crate::automation::detection::find_stored_template;
 use crate::automation::interaction::delay_ms;
-use crate::ui::image_clicker::{ImageUiAction, render_ui};
+use crate::calibration::{CalibrationManager, CalibrationResult};
 use crate::core::worker::Worker;
+use crate::settings::AcceptItemSettings;
+use crate::tools::r#trait::Tool;
+use crate::ui::image_clicker::{render_ui, ImageUiAction};
+use eframe::egui;
 use std::sync::{Arc, Mutex};
+use windows::Win32::Foundation::HWND;
 
 pub struct ImageClickerTool {
     // UI state
@@ -37,9 +37,9 @@ impl Tool for ImageClickerTool {
     fn stop(&mut self) {
         self.worker.stop();
         if self.worker.get_status().contains("Stopped") {
-             // Already stopped
+            // Already stopped
         } else {
-             self.worker.set_status("Stopped (ESC pressed)");
+            self.worker.set_status("Stopped (ESC pressed)");
         }
     }
 
@@ -48,16 +48,22 @@ impl Tool for ImageClickerTool {
     }
 
     fn start(&mut self, app_settings: &crate::settings::AppSettings, game_hwnd: Option<HWND>) {
-         let settings = &app_settings.accept_item;
+        let settings = &app_settings.accept_item;
 
-         if let Some(hwnd) = game_hwnd {
-             self.start_automation(settings.clone(), hwnd);
-         } else {
-             self.worker.set_status("Connect to game first");
-         }
+        if let Some(hwnd) = game_hwnd {
+            self.start_automation(settings.clone(), hwnd);
+        } else {
+            self.worker.set_status("Connect to game first");
+        }
     }
 
-    fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut crate::settings::AppSettings, game_hwnd: Option<HWND>) {
+    fn update(
+        &mut self,
+        ctx: &egui::Context,
+        ui: &mut egui::Ui,
+        settings: &mut crate::settings::AppSettings,
+        game_hwnd: Option<HWND>,
+    ) {
         let settings = &mut settings.accept_item;
 
         // Sync UI with Settings on first load
@@ -75,16 +81,16 @@ impl Tool for ImageClickerTool {
                 }
             }
         } else {
-             // Disconnected logic
-             if self.worker.is_running() {
-                 self.worker.stop();
-                 self.worker.set_status("Disconnected");
-             }
+            // Disconnected logic
+            if self.worker.is_running() {
+                self.worker.stop();
+                self.worker.set_status("Disconnected");
+            }
         }
 
         // Repaint if calibrating to capture clicks immediately
         if self.calibration.is_active() {
-             ctx.request_repaint();
+            ctx.request_repaint();
         }
 
         let is_running = self.worker.is_running();
@@ -97,6 +103,7 @@ impl Tool for ImageClickerTool {
             &mut settings.image_path, // Bind directly to settings string
             &mut self.interval_ms_str,
             &mut settings.tolerance,
+            &mut settings.show_in_overlay,
             settings.search_region,
             is_calibrating,
             is_waiting_for_second_click,
@@ -114,24 +121,24 @@ impl Tool for ImageClickerTool {
             ImageUiAction::StartRegionCalibration => {
                 self.calibration.start_area();
                 self.worker.set_status("Click top-left, then bottom-right");
-            },
+            }
             ImageUiAction::CancelCalibration => {
                 self.calibration.cancel();
                 self.worker.set_status("Calibration cancelled");
-            },
+            }
             ImageUiAction::ClearRegion => {
                 settings.search_region = None;
-            },
+            }
             ImageUiAction::Start => {
                 if game_hwnd.is_none() {
                     self.worker.set_status("Connect to game first");
                 } else {
                     self.start_automation(settings.clone(), game_hwnd.unwrap());
                 }
-            },
+            }
             ImageUiAction::Stop => {
                 self.stop();
-            },
+            }
             ImageUiAction::None => {}
         }
     }
@@ -148,55 +155,65 @@ impl ImageClickerTool {
 
         let image_path = settings.image_path.clone(); // Clone for thread
 
-        self.worker.start(move |running: Arc<Mutex<bool>>, status: Arc<Mutex<String>>, _log: Arc<Mutex<std::collections::VecDeque<String>>>| {
-            let mut ctx = match AutomationContext::new(game_hwnd) {
-                Ok(c) => c,
-                Err(e) => {
-                    *status.lock().unwrap() = format!("Error: {}", e);
+        self.worker.start(
+            move |running: Arc<Mutex<bool>>,
+                  status: Arc<Mutex<String>>,
+                  _log: Arc<Mutex<std::collections::VecDeque<String>>>| {
+                let mut ctx = match AutomationContext::new(game_hwnd) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        *status.lock().unwrap() = format!("Error: {}", e);
+                        *running.lock().unwrap() = false;
+                        return;
+                    }
+                };
+
+                if let Err(e) =
+                    ctx.store_template(&image_path, settings.search_region, "target_image")
+                {
+                    *status.lock().unwrap() = format!("Image Error: {}", e);
                     *running.lock().unwrap() = false;
                     return;
                 }
-            };
 
-            if let Err(e) = ctx.store_template(&image_path, settings.search_region, "target_image") {
-                 *status.lock().unwrap() = format!("Image Error: {}", e);
-                 *running.lock().unwrap() = false;
-                 return;
-            }
+                *status.lock().unwrap() = "Searching...".to_string();
 
-            *status.lock().unwrap() = "Searching...".to_string();
+                while *running.lock().unwrap() {
+                    // Using settings.tolerance which is now treated as Minimum Confidence
+                    match find_stored_template(&mut ctx.gui, "target_image", settings.tolerance) {
+                        Some(matches) if !matches.is_empty() => {
+                            let (screen_x, screen_y) = matches[0];
 
-            while *running.lock().unwrap() {
-                // Using settings.tolerance which is now treated as Minimum Confidence
-                match find_stored_template(&mut ctx.gui, "target_image", settings.tolerance) {
-                    Some(matches) if !matches.is_empty() => {
-                        let (screen_x, screen_y) = matches[0];
+                            *status.lock().unwrap() =
+                                format!("Found at ({}, {}), clicking...", screen_x, screen_y);
 
-                        *status.lock().unwrap() = format!("Found at ({}, {}), clicking...", screen_x, screen_y);
+                            // Convert screen coords to window coords for Direct Click
+                            use crate::core::input::click_at_position;
+                            use crate::core::window::screen_to_window_coords;
 
-                        // Convert screen coords to window coords for Direct Click
-                        use crate::core::window::screen_to_window_coords;
-                        use crate::core::input::click_at_position;
+                            if let Some((client_x, client_y)) =
+                                screen_to_window_coords(game_hwnd, screen_x as i32, screen_y as i32)
+                            {
+                                click_at_position(game_hwnd, client_x, client_y);
+                            } else {
+                                *status.lock().unwrap() =
+                                    "Error converting coordinates".to_string();
+                            }
 
-                        if let Some((client_x, client_y)) = screen_to_window_coords(game_hwnd, screen_x as i32, screen_y as i32) {
-                             click_at_position(game_hwnd, client_x, client_y);
-                        } else {
-                             *status.lock().unwrap() = "Error converting coordinates".to_string();
+                            // Hardcoded safety delay after click to prevent double-clicking
+                            delay_ms(500);
                         }
-
-                        // Hardcoded safety delay after click to prevent double-clicking
-                        delay_ms(500);
-                    },
-                    _ => {
-                        *status.lock().unwrap() = "Searching...".to_string();
+                        _ => {
+                            *status.lock().unwrap() = "Searching...".to_string();
+                        }
                     }
+
+                    // User-configured polling interval (how often to check screen)
+                    delay_ms(settings.interval_ms);
                 }
 
-                // User-configured polling interval (how often to check screen)
-                delay_ms(settings.interval_ms);
-            }
-
-            *status.lock().unwrap() = "Stopped".to_string();
-        });
+                *status.lock().unwrap() = "Stopped".to_string();
+            },
+        );
     }
 }
