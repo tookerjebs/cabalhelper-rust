@@ -52,9 +52,14 @@ pub fn render_header(
             ui.spacing_mut().item_spacing = egui::vec2(6.0, 0.0);
             let button_size = egui::vec2(66.0, 26.0);
             let compact_size = egui::vec2(66.0, 26.0);
+            let help_size = egui::vec2(26.0, 26.0);
 
             if ui
-                .add_sized(button_size, egui::Button::new("?"))
+                .add_sized(
+                    help_size,
+                    egui::Button::new(egui::RichText::new("?").strong())
+                        .rounding(egui::Rounding::same(13.0)),
+                )
                 .clicked()
             {
                 action = HeaderAction::Help;

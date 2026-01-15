@@ -131,7 +131,7 @@ pub enum ComparisonMode {
 
 impl Default for ComparisonMode {
     fn default() -> Self {
-        ComparisonMode::Equals
+        ComparisonMode::GreaterThanOrEqual
     }
 }
 
@@ -165,7 +165,7 @@ pub enum OcrNameMatchMode {
 
 impl Default for OcrNameMatchMode {
     fn default() -> Self {
-        OcrNameMatchMode::Exact
+        OcrNameMatchMode::Contains
     }
 }
 

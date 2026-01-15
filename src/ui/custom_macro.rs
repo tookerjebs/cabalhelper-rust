@@ -94,8 +94,8 @@ pub fn render_ui(
                     alt_target_enabled: false,
                     alt_target_stat: String::new(),
                     alt_target_value: 0,
-                    comparison: ComparisonMode::Equals,
-                    name_match_mode: OcrNameMatchMode::Exact,
+                    comparison: ComparisonMode::GreaterThanOrEqual,
+                    name_match_mode: OcrNameMatchMode::Contains,
                 });
             }
         });
@@ -342,65 +342,63 @@ pub fn render_ui(
                                     });
 
                                     ui.add_space(4.0);
+                                    egui::CollapsingHeader::new("Advanced settings")
+                                        .default_open(false)
+                                        .show(ui, |ui| {
+                                            ui.horizontal(|ui| {
+                                                ui.label("Scale:");
+                                                egui::ComboBox::from_id_source(format!(
+                                                    "ocr_scale_{}",
+                                                    idx
+                                                ))
+                                                .selected_text(format!("{}x", *scale_factor))
+                                                .show_ui(ui, |ui| {
+                                                    ui.selectable_value(scale_factor, 1, "1x");
+                                                    ui.selectable_value(scale_factor, 2, "2x");
+                                                    ui.selectable_value(scale_factor, 3, "3x");
+                                                    ui.selectable_value(scale_factor, 4, "4x");
+                                                });
 
-                                    ui.horizontal(|ui| {
-                                        ui.label("Scale:");
-                                        egui::ComboBox::from_id_source(format!(
-                                            "ocr_scale_{}",
-                                            idx
-                                        ))
-                                        .selected_text(format!("{}x", *scale_factor))
-                                        .show_ui(
-                                            ui,
-                                            |ui| {
-                                                ui.selectable_value(scale_factor, 1, "1x");
-                                                ui.selectable_value(scale_factor, 2, "2x");
-                                                ui.selectable_value(scale_factor, 3, "3x");
-                                                ui.selectable_value(scale_factor, 4, "4x");
-                                            },
-                                        );
+                                                ui.checkbox(invert_colors, "Invert");
+                                                ui.checkbox(grayscale, "Grayscale");
+                                            });
 
-                                        ui.checkbox(invert_colors, "Invert");
-                                        ui.checkbox(grayscale, "Grayscale");
-                                    });
+                                            ui.add_space(4.0);
 
-                                    ui.add_space(4.0);
+                                            ui.horizontal(|ui| {
+                                                ui.label("Decode:");
+                                                egui::ComboBox::from_id_source(format!(
+                                                    "ocr_decode_mode_{}",
+                                                    idx
+                                                ))
+                                                .selected_text(match decode_mode {
+                                                    OcrDecodeMode::Greedy => "Greedy (fast)",
+                                                    OcrDecodeMode::BeamSearch => "Beam Search",
+                                                })
+                                                .show_ui(ui, |ui| {
+                                                    ui.selectable_value(
+                                                        decode_mode,
+                                                        OcrDecodeMode::Greedy,
+                                                        "Greedy (fast)",
+                                                    );
+                                                    ui.selectable_value(
+                                                        decode_mode,
+                                                        OcrDecodeMode::BeamSearch,
+                                                        "Beam Search",
+                                                    );
+                                                });
 
-                                    ui.horizontal(|ui| {
-                                        ui.label("Decode:");
-                                        egui::ComboBox::from_id_source(format!(
-                                            "ocr_decode_mode_{}",
-                                            idx
-                                        ))
-                                        .selected_text(match decode_mode {
-                                            OcrDecodeMode::Greedy => "Greedy (fast)",
-                                            OcrDecodeMode::BeamSearch => "Beam Search",
-                                        })
-                                        .show_ui(
-                                            ui,
-                                            |ui| {
-                                                ui.selectable_value(
-                                                    decode_mode,
-                                                    OcrDecodeMode::Greedy,
-                                                    "Greedy (fast)",
-                                                );
-                                                ui.selectable_value(
-                                                    decode_mode,
-                                                    OcrDecodeMode::BeamSearch,
-                                                    "Beam Search",
-                                                );
-                                            },
-                                        );
-
-                                        if matches!(decode_mode, OcrDecodeMode::BeamSearch) {
-                                            ui.label("Beam width:");
-                                            ui.add_sized(
-                                                egui::vec2(80.0, 0.0),
-                                                egui::DragValue::new(beam_width)
-                                                    .clamp_range(2..=64),
-                                            );
-                                        }
-                                    });
+                                                if matches!(decode_mode, OcrDecodeMode::BeamSearch)
+                                                {
+                                                    ui.label("Beam width:");
+                                                    ui.add_sized(
+                                                        egui::vec2(80.0, 0.0),
+                                                        egui::DragValue::new(beam_width)
+                                                            .clamp_range(2..=64),
+                                                    );
+                                                }
+                                            });
+                                        });
 
                                     ui.add_space(4.0);
 
@@ -444,7 +442,7 @@ pub fn render_ui(
                                     });
 
                                     ui.horizontal(|ui| {
-                                        ui.label("Compare:");
+                                        ui.label("Stat Value:");
                                         egui::ComboBox::from_id_source(format!("ocr_cmp_{}", idx))
                                             .selected_text(match comparison {
                                                 ComparisonMode::Equals => "Equal (==)",

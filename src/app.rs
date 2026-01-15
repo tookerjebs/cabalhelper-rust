@@ -356,44 +356,109 @@ impl eframe::App for CabalHelperApp {
                     crate::ui::app_header::HeaderAction::None => {}
                 }
 
-                egui::Window::new("Help")
-                    .open(&mut self.show_help_window)
-                    .resizable(true)
-                    .default_width(420.0)
-                    .show(ctx, |ui| {
-                        ui.heading("Cabal Helper");
-                        ui.label("Automation tools for Cabal Online with overlay support.");
-                        ui.add_space(6.0);
+                if self.show_help_window {
+                    let help_viewport_id = egui::ViewportId::from_hash_of("help_window");
+                    let help_builder = egui::ViewportBuilder::default()
+                        .with_title("Help")
+                        .with_inner_size([640.0, 620.0])
+                        .with_min_inner_size([520.0, 420.0])
+                        .with_resizable(true);
+                    let should_close = ctx.show_viewport_immediate(
+                        help_viewport_id,
+                        help_builder,
+                        |ctx, _class| {
+                            let mut close_requested = false;
+                            if ctx.input(|i| i.viewport().close_requested()) {
+                                close_requested = true;
+                            }
 
-                        ui.collapsing("Overview", |ui| {
-                            ui.label("- Connect to the game window to enable tools.");
-                            ui.label("- Pick a tool tab, configure it, then Start.");
-                            ui.label("- ESC stops any running tool immediately.");
-                        });
+                            egui::CentralPanel::default().show(ctx, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.heading("Help");
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            if ui.button("Close").clicked() {
+                                                close_requested = true;
+                                            }
+                                        },
+                                    );
+                                });
+                                ui.label("Short, exact explanations for each setting.");
+                                ui.add_space(8.0);
 
-                        ui.collapsing("Click Methods (Custom Macro -> Click)", |ui| {
-                            ui.label("- Direct: SendMessage, default and reliable.");
-                            ui.label("- Move: moves the cursor and clicks physically.");
-                        });
+                                ui.group(|ui| {
+                                    ui.label(egui::RichText::new("Quick start").strong());
+                                    ui.label("- Connect to the game window.");
+                                    ui.label("- Pick a tool tab, configure it, then press Start.");
+                                    ui.label("- Press ESC any time to stop running tools.");
+                                });
 
-                        ui.collapsing("Settings and Options", |ui| {
-                            ui.label("- Image Clicker: image, interval, confidence, region.");
-                            ui.label("- Collection Filler: red dot, delay, tolerance.");
-                            ui.label("- Calibration sets areas and button positions.");
-                            ui.label("- OCR Search: region, scale, invert, grayscale, decode.");
-                        });
+                                ui.add_space(8.0);
 
-                        ui.collapsing("Overlay and Log", |ui| {
-                            ui.label("- Overlay is an always-on-top tool bar.");
-                            ui.label("- Drag the overlay bar to reposition it.");
-                            ui.label("- Log panel shows output for the active tab.");
-                        });
+                                ui.group(|ui| {
+                                    ui.label(egui::RichText::new("Image Clicker settings").strong());
+                                    ui.label("- Image Path: file to find on screen; use a clean PNG/JPG.");
+                                    ui.label("- Interval (ms): time between searches; lower is faster.");
+                                    ui.label("- Confidence: match threshold; higher is stricter.");
+                                    ui.label("- Detection Area: optional; set region to speed up search.");
+                                    ui.label("- Show in overlay: show this tool in the overlay bar.");
+                                });
 
-                        ui.collapsing("Autosave", |ui| {
-                            ui.label("- Settings auto-save after changes.");
-                            ui.label("- No manual save button is required.");
-                        });
-                    });
+                                ui.add_space(8.0);
+
+                                ui.group(|ui| {
+                                    ui.label(egui::RichText::new("Collection Filler settings").strong());
+                                    ui.label("- Red Dot Image: the red dot screenshot used for detection.");
+                                    ui.label("- Delay (ms): wait between clicks; too low can misclick.");
+                                    ui.label("- Red Dot Tolerance: match threshold for the red dot.");
+                                    ui.label("- Tabs Area: box that contains the collection tabs.");
+                                    ui.label("- Dungeon List: box that contains the dungeon list.");
+                                    ui.label("- Items Area: box that contains the collection items grid.");
+                                    ui.label(
+                                        "- Auto Refill/Register/Yes/Page 2-4/Arrow Right: click points.",
+                                    );
+                                    ui.label("- Show in overlay: show this tool in the overlay bar.");
+                                });
+
+                                ui.add_space(8.0);
+
+                                ui.group(|ui| {
+                                    ui.label(egui::RichText::new("Custom Macro settings").strong());
+                                    ui.label("- Macro Name: name shown in the tab and overlay.");
+                                    ui.label("- Show in overlay: show this macro in the overlay bar.");
+                                    ui.label("- Action: Click uses Position, Button, and Method.");
+                                    ui.label("- Action: Type Text sends the exact text you enter.");
+                                    ui.label("- Action: Delay waits the given milliseconds.");
+                                    ui.label("- Action: OCR Search checks text/value in a region.");
+                                    ui.label("  - Region: click top-left then bottom-right.");
+                                    ui.label("  - Stat: text to look for (example: \"Defense\").");
+                                    ui.label("  - Value: number to compare against OCR result.");
+                                    ui.label("  - Alt target: optional second stat/value (OR).");
+                                    ui.label("  - Value check: how the number is compared.");
+                                    ui.label("  - Name match: exact or contains text match.");
+                                    ui.label("  - Advanced settings: scale, grayscale, invert, decode.");
+                                });
+
+                                ui.add_space(8.0);
+
+                                ui.group(|ui| {
+                                    ui.label(egui::RichText::new("Notes").strong());
+                                    ui.label("- Recalibrate regions if the game window size changes.");
+                                    ui.label("- Overlay mode shows a small always-on-top toolbar.");
+                                    ui.label("- Log panel shows what the active tool is doing.");
+                                    ui.label("- Settings save automatically.");
+                                });
+                            });
+
+                            close_requested
+                        },
+                    );
+
+                    if should_close {
+                        self.show_help_window = false;
+                    }
+                }
 
                 ui.separator();
 
