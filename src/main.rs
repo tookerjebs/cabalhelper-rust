@@ -22,7 +22,7 @@ fn main() -> Result<(), eframe::Error> {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([720.0, 520.0]) // Increased size for better tab view
+            .with_inner_size([720.0, 620.0]) // Increased base height for normal view
             .with_title("Cabal Helper - Rust Edition")
             .with_transparent(true),
         ..Default::default()

@@ -104,6 +104,30 @@ impl CabalHelperApp {
         }
     }
 
+    fn sync_tool_names_from_settings(&mut self) {
+        let mut names: Vec<String> = Vec::with_capacity(2 + self.settings.custom_macros.len());
+        names.push("Image Clicker".to_string());
+        names.push("Collection Filler".to_string());
+        for named_macro in &self.settings.custom_macros {
+            names.push(named_macro.name.clone());
+        }
+
+        if names == self.tool_names {
+            return;
+        }
+
+        let selected_index = self
+            .tool_names
+            .iter()
+            .position(|name| name == &self.selected_tab);
+        self.tool_names = names;
+        if let Some(idx) = selected_index {
+            if let Some(new_name) = self.tool_names.get(idx) {
+                self.selected_tab = new_name.clone();
+            }
+        }
+    }
+
     fn tool_visible_in_overlay(&self, idx: usize) -> bool {
         match idx {
             0 => self.settings.accept_item.show_in_overlay,
@@ -281,7 +305,7 @@ impl eframe::App for CabalHelperApp {
                                 egui::WindowLevel::Normal,
                             ));
                             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(
-                                [600.0, 450.0].into(),
+                                [720.0, 620.0].into(),
                             ));
                         }
                     });
@@ -460,49 +484,107 @@ impl eframe::App for CabalHelperApp {
                     }
                 }
 
-                ui.separator();
+                ui.add_space(8.0); // Spacing after header
 
-                // Dynamic Tab Rendering
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing = egui::vec2(6.0, 0.0);
+                // --- Browser-Style Tabs ---
+                egui::Frame::none()
+                    .fill(egui::Color32::TRANSPARENT)
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing = egui::vec2(6.0, 0.0);
+                            let tab_rounding = egui::Rounding {
+                                nw: 6.0,
+                                ne: 6.0,
+                                sw: 0.0,
+                                se: 0.0,
+                            };
 
-                    for (_idx, name) in self.tool_names.iter().enumerate() {
-                        if ui
-                            .selectable_label(self.selected_tab == *name, name)
-                            .clicked()
-                        {
-                            self.selected_tab = name.clone();
-                        }
-                    }
+                            for (_idx, name) in self.tool_names.iter().enumerate() {
+                                let is_selected = self.selected_tab == *name;
+                                let (text_color, bg, stroke) = if is_selected {
+                                    (
+                                        egui::Color32::WHITE,
+                                        egui::Color32::from_rgb(35, 35, 38),
+                                        egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 60, 60)),
+                                    )
+                                } else {
+                                    (
+                                        egui::Color32::from_rgb(170, 170, 170),
+                                        egui::Color32::from_rgb(22, 22, 24),
+                                        egui::Stroke::new(1.0, egui::Color32::from_rgb(40, 40, 40)),
+                                    )
+                                };
 
-                    if self.settings.custom_macros.len() < MAX_CUSTOM_MACROS {
-                        if ui.button("New Macro").clicked() {
-                            let new_macro_name =
-                                format!("Macro {}", self.settings.custom_macros.len() + 1);
-                            self.settings
-                                .custom_macros
-                                .push(NamedMacro::new(new_macro_name.clone()));
-                            self.rebuild_tools();
-                            self.selected_tab = new_macro_name;
-                            self.settings.auto_save();
-                        }
-                    }
-                });
+                                let btn = egui::Button::new(
+                                    egui::RichText::new(name)
+                                        .size(13.0)
+                                        .color(text_color)
+                                        .strong(),
+                                )
+                                .frame(true)
+                                .fill(bg)
+                                .stroke(stroke)
+                                .rounding(tab_rounding)
+                                .min_size(egui::vec2(0.0, 30.0));
 
-                ui.separator();
+                                if ui.add(btn).clicked() {
+                                    self.selected_tab = name.clone();
+                                }
+                            }
 
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    // Find the selected tool by name and update it
-                    if let Some(idx) = self
-                        .tool_names
-                        .iter()
-                        .position(|name| name == &self.selected_tab)
-                    {
-                        if let Some(tool) = self.tools.get_mut(idx) {
-                            tool.update(ctx, ui, &mut self.settings, self.game_hwnd);
-                        }
-                    }
-                });
+                            if self.settings.custom_macros.len() < MAX_CUSTOM_MACROS {
+                                let btn = egui::Button::new(
+                                    egui::RichText::new("+")
+                                        .size(16.0)
+                                        .color(egui::Color32::from_rgb(140, 140, 140)),
+                                )
+                                .frame(true)
+                                .fill(egui::Color32::from_rgb(22, 22, 24))
+                                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(40, 40, 40)))
+                                .rounding(tab_rounding)
+                                .min_size(egui::vec2(30.0, 30.0));
+
+                                if ui.add(btn).clicked() {
+                                    let new_macro_name =
+                                        format!("Macro {}", self.settings.custom_macros.len() + 1);
+                                    self.settings
+                                        .custom_macros
+                                        .push(NamedMacro::new(new_macro_name.clone()));
+                                    self.rebuild_tools();
+                                    self.selected_tab = new_macro_name;
+                                    self.settings.auto_save();
+                                }
+                            }
+                        });
+                    });
+
+                ui.add_space(4.0);
+
+                // --- Main Content Area ---
+                // Framed area for the tool content to give it depth
+                egui::Frame::none()
+                    .fill(egui::Color32::from_rgb(25, 25, 25)) // Slightly lighter than background
+                    .rounding(egui::Rounding::same(8.0))
+                    .inner_margin(egui::Margin::same(12.0))
+                    .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(45, 45, 45)))
+                    .show(ui, |ui| {
+                         egui::ScrollArea::vertical()
+                            .auto_shrink([false, false]) // Expand to fill
+                            .show(ui, |ui| {
+                            // Find the selected tool by name and update it
+                            if let Some(idx) = self
+                                .tool_names
+                                .iter()
+                                .position(|name| name == &self.selected_tab)
+                            {
+                                if let Some(tool) = self.tools.get_mut(idx) {
+                                    tool.update(ctx, ui, &mut self.settings, self.game_hwnd);
+                                }
+                            }
+                        });
+                    });
+
+                self.sync_tool_names_from_settings();
 
                 // Check if macro count changed (e.g., macro was deleted)
                 // We need to rebuild tools to stay in sync

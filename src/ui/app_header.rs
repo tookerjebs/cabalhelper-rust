@@ -19,93 +19,136 @@ pub fn render_header(
 ) -> HeaderAction {
     let mut action = HeaderAction::None;
 
-    ui.horizontal(|ui| {
-        // --- Left Side: Connection status stack ---
-        ui.vertical(|ui| {
-            if let Some(hwnd) = game_hwnd {
-                ui.label(
-                    egui::RichText::new(format!("Connected to {}", game_title))
-                        .color(egui::Color32::from_rgb(168, 226, 187))
-                        .strong(),
-                );
+    // Use a Frame to give the header a distinct look
+    egui::Frame::none()
+        .fill(egui::Color32::from_rgb(32, 33, 36)) // Darker background for header
+        .inner_margin(egui::Margin::symmetric(16.0, 12.0))
+        .rounding(egui::Rounding {
+            sw: 8.0,
+            se: 8.0,
+            ..Default::default()
+        })
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                // --- Left Side: Connection status ---
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 8.0;
 
-                if let Some((_, _, w, h)) =
-                    crate::core::window::get_client_rect_in_screen_coords(*hwnd)
-                {
-                    ui.label(
-                        egui::RichText::new(format!("{}x{}", w, h))
-                            .color(egui::Color32::from_rgb(140, 140, 140))
-                            .small(),
-                    );
-                }
-            } else {
-                ui.label(
-                    egui::RichText::new(format!("Status: {}", game_title))
-                        .color(egui::Color32::from_rgb(200, 200, 200))
-                        .strong(),
-                );
-            }
-        });
-
-        // --- Right Side: All Buttons ---
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-            ui.spacing_mut().item_spacing = egui::vec2(6.0, 0.0);
-            let button_size = egui::vec2(66.0, 26.0);
-            let compact_size = egui::vec2(66.0, 26.0);
-            let help_size = egui::vec2(26.0, 26.0);
-
-            if ui
-                .add_sized(
-                    help_size,
-                    egui::Button::new(egui::RichText::new("?").strong())
-                        .rounding(egui::Rounding::same(13.0)),
-                )
-                .clicked()
-            {
-                action = HeaderAction::Help;
-            }
-
-            if ui
-                .add_sized(compact_size, egui::Button::new("Log"))
-                .clicked()
-            {
-                action = HeaderAction::ToggleLog;
-            }
-
-            // Overlay Toggle (No Icon)
-            if ui
-                .add_sized(compact_size, egui::Button::new("Overlay"))
-                .clicked()
-            {
-                action = HeaderAction::ToggleOverlay;
-            }
-
-            // Connect/Disconnect Button
-            if game_hwnd.is_none() {
-                if ui
-                    .add_sized(button_size, egui::Button::new("Connect"))
-                    .clicked()
-                {
-                    if let Some((hwnd, title)) = find_game_window() {
-                        *game_hwnd = Some(hwnd);
-                        *game_title = title;
-                        action = HeaderAction::Connect(hwnd);
+                    // Status Dot
+                    let (dot_color, status_text) = if game_hwnd.is_some() {
+                        (egui::Color32::from_rgb(76, 175, 80), "Connected") // Green
                     } else {
-                        *game_title = "No D3D Window found".to_string();
+                        (egui::Color32::from_rgb(244, 67, 54), "Disconnected") // Red
+                    };
+
+                    let (rect, _) = ui.allocate_exact_size(
+                        egui::vec2(10.0, 10.0),
+                        egui::Sense::hover(),
+                    );
+                    ui.painter().circle_filled(rect.center(), 4.0, dot_color);
+
+                    // Status Text Stack
+                    ui.vertical(|ui| {
+                        ui.label(
+                            egui::RichText::new(status_text)
+                                .color(egui::Color32::from_rgb(220, 220, 220))
+                                .strong()
+                                .size(14.0),
+                        );
+
+                        if let Some(hwnd) = game_hwnd {
+                            if let Some((_, _, w, h)) =
+                                crate::core::window::get_client_rect_in_screen_coords(*hwnd)
+                            {
+                                ui.label(
+                                    egui::RichText::new(format!("{} ({}x{})", game_title, w, h))
+                                        .color(egui::Color32::from_rgb(150, 150, 150))
+                                        .size(11.0),
+                                );
+                            }
+                        } else {
+                            ui.label(
+                                egui::RichText::new("Waiting for game window...")
+                                    .color(egui::Color32::from_rgb(100, 100, 100))
+                                    .size(11.0),
+                            );
+                        }
+                    });
+                });
+
+                // --- Right Side: Actions ---
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(8.0, 0.0);
+
+                    // Styled Button Helper
+                    let styled_button = |ui: &mut egui::Ui, text: &str, fill: Option<egui::Color32>| {
+                        let btn = egui::Button::new(
+                            egui::RichText::new(text)
+                                .size(13.0)
+                                .color(egui::Color32::WHITE),
+                        )
+                        .min_size(egui::vec2(0.0, 28.0))
+                        .rounding(6.0);
+                        
+                        // Use fill if provided (e.g., for Connect), otherwise transparent/default
+                        if let Some(c) = fill {
+                            ui.add(btn.fill(c))
+                        } else {
+                            ui.add(btn.fill(egui::Color32::from_white_alpha(10))) // Subtle frosted look
+                        }
+                    };
+
+                    // Help
+                    if ui.add(
+                        egui::Button::new("?")
+                            .rounding(100.0) // Circle
+                            .min_size(egui::vec2(28.0, 28.0))
+                            .fill(egui::Color32::from_white_alpha(10))
+                    ).clicked() {
+                        action = HeaderAction::Help;
                     }
-                }
-            } else {
-                if ui
-                    .add_sized(button_size, egui::Button::new("Disconnect"))
-                    .clicked()
-                {
-                    *game_hwnd = None;
-                    *game_title = "Disconnected".to_string();
-                    action = HeaderAction::Disconnect;
-                }
-            }
+
+                    // Log
+                    if styled_button(ui, "Log", None).clicked() {
+                        action = HeaderAction::ToggleLog;
+                    }
+
+                    // Overlay
+                    if styled_button(ui, "Overlay", None).clicked() {
+                        action = HeaderAction::ToggleOverlay;
+                    }
+
+                    ui.add_space(8.0); // Separator between utilities and main action
+
+                    // Connect/Disconnect
+                    if game_hwnd.is_none() {
+                        if styled_button(
+                            ui, 
+                            "Connect", 
+                            Some(egui::Color32::from_rgb(50, 100, 200)) // Nice Blue
+                        ).clicked() {
+                            if let Some((hwnd, title)) = find_game_window() {
+                                *game_hwnd = Some(hwnd);
+                                *game_title = title;
+                                action = HeaderAction::Connect(hwnd);
+                            } else {
+                                *game_title = "No D3D Window found".to_string();
+                            }
+                        }
+                    } else {
+                         if styled_button(
+                            ui, 
+                            "Disconnect", 
+                            Some(egui::Color32::from_rgb(200, 60, 60)) // Red
+                        ).clicked() {
+                            *game_hwnd = None;
+                            *game_title = "Disconnected".to_string();
+                            action = HeaderAction::Disconnect;
+                        }
+                    }
+                });
+            });
         });
-    });
 
     action
 }
