@@ -339,7 +339,9 @@ pub fn render_ui(
                                                 ui.add(egui::DragValue::new(target_value).speed(1));
                                             });
 
-                                            ui.collapsing("More Options...", |ui| {
+                                            egui::CollapsingHeader::new("More Options...")
+                                                .id_source(format!("ocr_more_{}", idx))
+                                                .show(ui, |ui| {
                                                 ui.horizontal(|ui| {
                                                     ui.checkbox(alt_target_enabled, "Or Condition");
                                                     if *alt_target_enabled {
@@ -373,7 +375,7 @@ pub fn render_ui(
                                                 });
 
                                                 // Simplified match mode
-                                                 egui::ComboBox::from_id_source(format!("match_{}", idx))
+                                                egui::ComboBox::from_id_source(format!("match_{}", idx))
                                                     .selected_text(match name_match_mode {
                                                         OcrNameMatchMode::Exact => "Exact Match",
                                                         OcrNameMatchMode::Contains => "Contains",
