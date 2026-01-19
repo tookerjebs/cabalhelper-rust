@@ -1,25 +1,30 @@
 # Cabal Helper - Rust Edition
 
-A collection of automation tools for Cabal Online, rewritten in Rust for performance.
+Automation tools for Cabal Online, rewritten in Rust for performance and stability.
 
 ## Features
 
-- **Collection Filler**: Automates filling collections.
-- **Image Clicker**: Auto-clicks on detected images.
-- **Tools**: Various utility macro tools.
+- **Collection Filler**: Automates collection completion via red-dot detection.
+- **Image Clicker**: Finds an image on screen and clicks it on an interval.
+- **Custom Macros**: Build action sequences (click/type/delay/OCR search).
+- **Overlay Bar**: Always-on-top quick controls while the game is running.
+
+## Requirements
+
+- Windows 10/11
 
 ## Usage
 
-1.  **Download Release**: Get the executable and assets from the [Releases](https://github.com/your-repo/releases) page.
-2.  **Assets**: Place `image.png` and `red-dot.png` in the same folder as the executable.
-3.  **Run**: Execute `cabalhelper-rust.exe`.
-4.  **Overlay**: Use the overlay dock to access tools.
+1. Download the latest release from https://github.com/tookerjebs/cabalhelper-rust/releases
+2. Put `image.png` and `red-dot.png` next to the executable (or set custom paths in the UI).
+3. Run `cabalhelper-rust.exe` and connect to the game window.
 
-## Configuration
+## Notes
 
-Settings are saved locally. Configure hotkeys and paths in the UI.
+- Settings are saved locally in `cabalhelper_settings.json`.
+- OCR actions require a visible game window for capture.
 
-## Building
+## Build
 
 ```bash
 cargo build --release
