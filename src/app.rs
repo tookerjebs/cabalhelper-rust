@@ -34,6 +34,8 @@ pub struct CabalHelperApp {
     // Optimization state
     last_window_check: std::time::Instant,
     last_esc_check: std::time::Instant,
+
+    last_window_always_on_top: bool,
 }
 
 impl Default for CabalHelperApp {
@@ -62,6 +64,7 @@ impl Default for CabalHelperApp {
             show_help_window: false,
             last_window_check: std::time::Instant::now(),
             last_esc_check: std::time::Instant::now(),
+            last_window_always_on_top: false,
         }
     }
 }
@@ -150,6 +153,9 @@ impl CabalHelperApp {
 
 impl eframe::App for CabalHelperApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        const LOG_PANEL_WIDTH: f32 = 280.0;
+        const MIN_WINDOW_WIDTH: f32 = 400.0;
+
         // Adaptive repaint rate based on mode
         let repaint_interval = if self.is_overlay_mode {
             std::time::Duration::from_millis(100) // 10 FPS for overlay
@@ -157,6 +163,16 @@ impl eframe::App for CabalHelperApp {
             std::time::Duration::from_millis(500) // 2 FPS for normal mode
         };
         ctx.request_repaint_after(repaint_interval);
+
+        if !self.is_overlay_mode && self.last_window_always_on_top != self.settings.always_on_top {
+            let level = if self.settings.always_on_top {
+                egui::WindowLevel::AlwaysOnTop
+            } else {
+                egui::WindowLevel::Normal
+            };
+            ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(level));
+            self.last_window_always_on_top = self.settings.always_on_top;
+        }
 
         // Emergency stop on ESC key
         use crate::core::input::is_escape_key_down;
@@ -301,9 +317,13 @@ impl eframe::App for CabalHelperApp {
                         if ui.add(btn).clicked() {
                             self.is_overlay_mode = false;
                             ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(true));
-                            ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(
-                                egui::WindowLevel::Normal,
-                            ));
+                            let level = if self.settings.always_on_top {
+                                egui::WindowLevel::AlwaysOnTop
+                            } else {
+                                egui::WindowLevel::Normal
+                            };
+                            ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(level));
+                            self.last_window_always_on_top = self.settings.always_on_top;
                             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(
                                 [720.0, 620.0].into(),
                             ));
@@ -335,6 +355,7 @@ impl eframe::App for CabalHelperApp {
                     ui,
                     &mut self.game_hwnd,
                     &mut self.status_message,
+                    &mut self.settings.always_on_top,
                 );
 
                 match action {
@@ -345,7 +366,26 @@ impl eframe::App for CabalHelperApp {
                         self.game_hwnd = None;
                     }
                     crate::ui::app_header::HeaderAction::ToggleLog => {
+                        let inner_rect = ctx.input(|i| i.viewport().inner_rect);
+                        let monitor_size = ctx.input(|i| i.viewport().monitor_size);
+                        let current_size = inner_rect
+                            .map(|rect| rect.size())
+                            .unwrap_or(egui::vec2(720.0, 620.0));
+
                         self.show_log_panel = !self.show_log_panel;
+
+                        let delta = if self.show_log_panel {
+                            LOG_PANEL_WIDTH
+                        } else {
+                            -LOG_PANEL_WIDTH
+                        };
+                        let mut new_width = (current_size.x + delta).max(MIN_WINDOW_WIDTH);
+                        if let Some(monitor) = monitor_size {
+                            new_width = new_width.min(monitor.x);
+                        }
+                        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(
+                            [new_width, current_size.y].into(),
+                        ));
                     }
                     crate::ui::app_header::HeaderAction::ToggleOverlay => {
                         self.is_overlay_mode = true;

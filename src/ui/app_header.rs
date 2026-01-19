@@ -16,6 +16,7 @@ pub fn render_header(
     ui: &mut egui::Ui,
     game_hwnd: &mut Option<HWND>,
     game_title: &mut String,
+    always_on_top: &mut bool,
 ) -> HeaderAction {
     let mut action = HeaderAction::None;
 
@@ -117,6 +118,8 @@ pub fn render_header(
                     if styled_button(ui, "Overlay", None).clicked() {
                         action = HeaderAction::ToggleOverlay;
                     }
+
+                    ui.checkbox(always_on_top, "Always on top");
 
                     ui.add_space(8.0); // Separator between utilities and main action
 

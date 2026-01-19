@@ -14,6 +14,9 @@ pub struct AppSettings {
 
     #[serde(default)]
     pub custom_macros: Vec<NamedMacro>,
+
+    #[serde(default)]
+    pub always_on_top: bool,
 }
 
 impl Default for AppSettings {
@@ -22,6 +25,7 @@ impl Default for AppSettings {
             collection_filler: CollectionFillerSettings::default(),
             accept_item: AcceptItemSettings::default(),
             custom_macros: vec![NamedMacro::default()],
+            always_on_top: false,
         }
     }
 }
