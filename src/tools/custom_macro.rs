@@ -64,7 +64,7 @@ impl Tool for CustomMacroTool {
         if self.worker.get_status().contains("Stopped") {
             // Already stopped
         } else {
-            self.worker.set_status("Stopped (ESC pressed)");
+            self.worker.set_status("Stopped (emergency hotkey)");
         }
     }
 
@@ -228,7 +228,7 @@ impl CustomMacroTool {
         self.worker.start(move |running: Arc<Mutex<bool>>, status: Arc<Mutex<String>>, log: Arc<Mutex<std::collections::VecDeque<String>>>| {
             use crate::core::input::click_at_position;
             use crate::automation::context::AutomationContext;
-            use crate::core::screen_capture::capture_region;
+            use crate::core::screen_capture::capture_window_region;
             use crate::core::ocr_parser::{parse_ocr_result, matches_target};
             use crate::core::window::client_to_screen_coords;
             use ocrs::{OcrEngine, OcrEngineParams, ImageSource, DecodeMethod};
@@ -348,18 +348,25 @@ impl CustomMacroTool {
                                 let btn_text = match button {
                                     crate::settings::MouseButton::Left => "Left",
                                     crate::settings::MouseButton::Right => "Right",
+                                    crate::settings::MouseButton::Middle => "Middle",
                                 };
                                 *status.lock().unwrap() = format!("{} Clicking at ({}, {})", btn_text, client_x, client_y);
 
                                 match click_method {
                                     crate::settings::ClickMethod::SendMessage => {
                                         // Direct click without mouse movement (default)
-                                        let is_left = matches!(button, crate::settings::MouseButton::Left);
-                                        if is_left {
-                                            click_at_position(game_hwnd, client_x, client_y);
-                                        } else {
-                                            use crate::core::input::right_click_at_position;
-                                            right_click_at_position(game_hwnd, client_x, client_y);
+                                        match button {
+                                            crate::settings::MouseButton::Left => {
+                                                click_at_position(game_hwnd, client_x, client_y);
+                                            }
+                                            crate::settings::MouseButton::Right => {
+                                                use crate::core::input::right_click_at_position;
+                                                right_click_at_position(game_hwnd, client_x, client_y);
+                                            }
+                                            crate::settings::MouseButton::Middle => {
+                                                use crate::core::input::middle_click_at_position;
+                                                middle_click_at_position(game_hwnd, client_x, client_y);
+                                            }
                                         }
                                     },
                                     crate::settings::ClickMethod::MouseMovement => {
@@ -371,13 +378,19 @@ impl CustomMacroTool {
                                                 continue;
                                             }
                                         };
-                                        let is_left = matches!(button, crate::settings::MouseButton::Left);
-                                        if is_left {
-                                            use crate::automation::interaction::click_at_screen;
-                                            click_at_screen(&mut ctx.gui, screen_x as u32, screen_y as u32);
-                                        } else {
-                                            use crate::automation::interaction::right_click_at_screen;
-                                            right_click_at_screen(&mut ctx.gui, screen_x as u32, screen_y as u32);
+                                        match button {
+                                            crate::settings::MouseButton::Left => {
+                                                use crate::automation::interaction::click_at_screen;
+                                                click_at_screen(&mut ctx.gui, screen_x as u32, screen_y as u32);
+                                            }
+                                            crate::settings::MouseButton::Right => {
+                                                use crate::automation::interaction::right_click_at_screen;
+                                                right_click_at_screen(&mut ctx.gui, screen_x as u32, screen_y as u32);
+                                            }
+                                            crate::settings::MouseButton::Middle => {
+                                                use crate::automation::interaction::middle_click_at_screen;
+                                                middle_click_at_screen(&mut ctx.gui, screen_x as u32, screen_y as u32);
+                                            }
                                         }
                                     },
                                 }
@@ -402,11 +415,9 @@ impl CustomMacroTool {
                             grayscale,
                             target_stat,
                             target_value,
-                            alt_target_enabled,
-                            alt_target_stat,
-                            alt_target_value,
                             comparison,
                             name_match_mode,
+                            alt_targets,
                             ..
                         } => {
                             if ocr_engine.is_none() {
@@ -432,9 +443,9 @@ impl CustomMacroTool {
 
                             let engine = ocr_engine.as_ref().unwrap();
 
-                            match capture_region(game_hwnd, region) {
+                            match capture_window_region(game_hwnd, region) {
                                 Ok(img) => {
-                                    let mut processed_img = image::DynamicImage::ImageRgb8(img);
+                                    let mut processed_img = image::DynamicImage::ImageRgba8(img);
 
                                     if *invert_colors {
                                         processed_img.invert();
@@ -485,7 +496,11 @@ impl CustomMacroTool {
                                                         .collect()
                                                 };
 
-                                                let matches_config = |stat: &str, value: i32| -> bool {
+                                                let matches_config = |stat: &str,
+                                                                      value: i32,
+                                                                      comparison: ComparisonMode,
+                                                                      name_match_mode: OcrNameMatchMode|
+                                                 -> bool {
                                                     if stat.trim().is_empty() {
                                                         return false;
                                                     }
@@ -495,7 +510,7 @@ impl CustomMacroTool {
                                                             detected_value,
                                                             stat,
                                                             value,
-                                                            *comparison,
+                                                            comparison,
                                                         ),
                                                         OcrNameMatchMode::Contains => {
                                                             let detected = normalize_contains(&detected_stat);
@@ -515,9 +530,27 @@ impl CustomMacroTool {
                                                     }
                                                 };
 
-                                                let mut matched = matches_config(target_stat, *target_value);
-                                                if !matched && *alt_target_enabled {
-                                                    matched = matches_config(alt_target_stat, *alt_target_value);
+                                                let mut matched = matches_config(
+                                                    target_stat,
+                                                    *target_value,
+                                                    *comparison,
+                                                    *name_match_mode,
+                                                );
+                                                if !matched {
+                                                    for alt in alt_targets.iter() {
+                                                        if alt.delay_ms > 0 {
+                                                            delay_ms(alt.delay_ms);
+                                                        }
+                                                        if matches_config(
+                                                            &alt.target_stat,
+                                                            alt.target_value,
+                                                            alt.comparison,
+                                                            alt.name_match_mode,
+                                                        ) {
+                                                            matched = true;
+                                                            break;
+                                                        }
+                                                    }
                                                 }
 
                                                 if matched {

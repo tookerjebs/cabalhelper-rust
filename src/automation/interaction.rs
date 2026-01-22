@@ -71,6 +71,35 @@ pub fn right_click_at_screen(gui: &mut RustAutoGui, x: u32, y: u32) {
     }
 }
 
+/// Middle click at screen coordinates (with retry logic from Python version)
+pub fn middle_click_at_screen(gui: &mut RustAutoGui, x: u32, y: u32) {
+    // Python does 2 click attempts with 50ms delay
+    for attempt in 0..2 {
+        // Move mouse to position (screen coordinates)
+        if let Err(_) = gui.move_mouse_to_pos(x, y, 0.0) {
+            if attempt == 0 {
+                thread::sleep(Duration::from_millis(50));
+                continue;
+            }
+            return;
+        }
+
+        // Short sleep to stabilize cursor
+        thread::sleep(Duration::from_millis(20));
+
+        // Perform physical middle click
+        if let Err(_) = gui.middle_click() {
+            if attempt == 0 {
+                thread::sleep(Duration::from_millis(50));
+                continue;
+            }
+        } else {
+            // Success on first or second attempt
+            return;
+        }
+    }
+}
+
 /// Click at normalized window-relative coordinates (converts to screen coords first)
 pub fn click_at_window_pos(gui: &mut RustAutoGui, game_hwnd: HWND, pos: NormPoint) -> bool {
     let (rel_x, rel_y) = match denormalize_point(game_hwnd, pos.0, pos.1) {

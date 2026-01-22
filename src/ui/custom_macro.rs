@@ -1,5 +1,6 @@
 use crate::settings::{
-    ComparisonMode, MacroAction, MouseButton, NamedMacro, OcrDecodeMode, OcrNameMatchMode,
+    ComparisonMode, MacroAction, MouseButton, NamedMacro, OcrAltTarget, OcrDecodeMode,
+    OcrNameMatchMode,
 };
 use eframe::egui;
 
@@ -13,6 +14,70 @@ pub enum CustomMacroUiAction {
     StopMacro,
     DeleteMacro,
     None,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum OcrPreprocessPreset {
+    Default,
+    HighContrast,
+    Invert,
+    Grayscale,
+    Custom,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum OcrAccuracyMode {
+    Fast,
+    HighAccuracy,
+}
+
+fn infer_ocr_preprocess_preset(
+    scale_factor: u32,
+    invert_colors: bool,
+    grayscale: bool,
+) -> OcrPreprocessPreset {
+    if invert_colors && grayscale && scale_factor >= 3 {
+        OcrPreprocessPreset::HighContrast
+    } else if invert_colors && !grayscale {
+        OcrPreprocessPreset::Invert
+    } else if !invert_colors && grayscale && scale_factor == 2 {
+        OcrPreprocessPreset::Grayscale
+    } else if !invert_colors && !grayscale && scale_factor == 2 {
+        OcrPreprocessPreset::Default
+    } else {
+        OcrPreprocessPreset::Custom
+    }
+}
+
+fn apply_ocr_preprocess_preset(
+    preset: OcrPreprocessPreset,
+    scale_factor: &mut u32,
+    invert_colors: &mut bool,
+    grayscale: &mut bool,
+) {
+    match preset {
+        OcrPreprocessPreset::Default => {
+            *scale_factor = 2;
+            *invert_colors = false;
+            *grayscale = false;
+        }
+        OcrPreprocessPreset::HighContrast => {
+            *scale_factor = 3;
+            *invert_colors = true;
+            *grayscale = true;
+        }
+        OcrPreprocessPreset::Invert => {
+            *scale_factor = 2;
+            *invert_colors = true;
+            *grayscale = false;
+        }
+        OcrPreprocessPreset::Grayscale => {
+            *scale_factor = 2;
+            *invert_colors = false;
+            *grayscale = true;
+        }
+        OcrPreprocessPreset::Custom => {}
+    }
 }
 
 /// Render the Custom Macro Builder UI
@@ -31,7 +96,7 @@ pub fn render_ui(
     if !game_connected {
         ui.colored_label(
             egui::Color32::RED,
-            "Please connect to game first (top right)",
+            "Please connect to game first (top left)",
         );
         return CustomMacroUiAction::None;
     }
@@ -111,11 +176,9 @@ pub fn render_ui(
                         beam_width: 10,
                         target_stat: String::new(),
                         target_value: 0,
-                        alt_target_enabled: false,
-                        alt_target_stat: String::new(),
-                        alt_target_value: 0,
                         comparison: ComparisonMode::GreaterThanOrEqual,
                         name_match_mode: OcrNameMatchMode::Contains,
+                        alt_targets: Vec::new(),
                     });
                 }
             });
@@ -258,6 +321,7 @@ pub fn render_ui(
 
                                                 ui.selectable_value(button, MouseButton::Left, "Left");
                                                 ui.selectable_value(button, MouseButton::Right, "Right");
+                                                ui.selectable_value(button, MouseButton::Middle, "Middle");
 
                                                 ui.separator();
 
@@ -293,11 +357,9 @@ pub fn render_ui(
                                             beam_width,
                                             target_stat,
                                             target_value,
-                                            alt_target_enabled,
-                                            alt_target_stat,
-                                            alt_target_value,
                                             comparison,
                                             name_match_mode,
+                                            alt_targets,
                                         } => {
                                             // Compact OCR UI
                                             ui.horizontal(|ui| {
@@ -337,53 +399,242 @@ pub fn render_ui(
                                                     });
 
                                                 ui.add(egui::DragValue::new(target_value).speed(1));
+
+                                                let match_label = match name_match_mode {
+                                                    OcrNameMatchMode::Exact => "Match: Exact",
+                                                    OcrNameMatchMode::Contains => "Match: Contains",
+                                                };
+                                                let match_combo = egui::ComboBox::from_id_source(
+                                                    format!("match_inline_{}", idx),
+                                                )
+                                                .selected_text(match_label)
+                                                .width(120.0);
+                                                let match_response =
+                                                    match_combo.show_ui(ui, |ui| {
+                                                        ui.selectable_value(
+                                                            name_match_mode,
+                                                            OcrNameMatchMode::Exact,
+                                                            "Match: Exact",
+                                                        );
+                                                        ui.selectable_value(
+                                                            name_match_mode,
+                                                            OcrNameMatchMode::Contains,
+                                                            "Match: Contains",
+                                                        );
+                                                    });
+                                                match_response.response.on_hover_text(
+                                                    "Exact: name must match fully. Contains: partial match.",
+                                                );
                                             });
 
-                                            egui::CollapsingHeader::new("More Options...")
-                                                .id_source(format!("ocr_more_{}", idx))
-                                                .show(ui, |ui| {
+                                            if ui.link("Add alternate target").clicked() {
+                                                alt_targets.push(OcrAltTarget {
+                                                    target_stat: String::new(),
+                                                    target_value: 0,
+                                                    comparison: *comparison,
+                                                    name_match_mode: *name_match_mode,
+                                                    delay_ms: 100,
+                                                });
+                                            }
+
+                                            let mut remove_alt: Option<usize> = None;
+                                            for (alt_idx, alt) in alt_targets.iter_mut().enumerate()
+                                            {
                                                 ui.horizontal(|ui| {
-                                                    ui.checkbox(alt_target_enabled, "Or Condition");
-                                                    if *alt_target_enabled {
-                                                        ui.text_edit_singleline(alt_target_stat);
-                                                        ui.add(egui::DragValue::new(alt_target_value));
+                                                    ui.label(format!("Alt {}:", alt_idx + 1));
+                                                    ui.add(
+                                                        egui::TextEdit::singleline(
+                                                            &mut alt.target_stat,
+                                                        )
+                                                        .desired_width(100.0)
+                                                        .hint_text("Stat Name"),
+                                                    );
+
+                                                    egui::ComboBox::from_id_source(format!(
+                                                        "alt_cmp_{}_{}",
+                                                        idx, alt_idx
+                                                    ))
+                                                    .selected_text(match alt.comparison {
+                                                        ComparisonMode::Equals => "=",
+                                                        ComparisonMode::GreaterThanOrEqual => ">=",
+                                                        ComparisonMode::LessThanOrEqual => "<=",
+                                                    })
+                                                    .width(40.0)
+                                                    .show_ui(ui, |ui| {
+                                                        ui.selectable_value(
+                                                            &mut alt.comparison,
+                                                            ComparisonMode::Equals,
+                                                            "=",
+                                                        );
+                                                        ui.selectable_value(
+                                                            &mut alt.comparison,
+                                                            ComparisonMode::GreaterThanOrEqual,
+                                                            ">=",
+                                                        );
+                                                        ui.selectable_value(
+                                                            &mut alt.comparison,
+                                                            ComparisonMode::LessThanOrEqual,
+                                                            "<=",
+                                                        );
+                                                    });
+
+                                                    ui.add(
+                                                        egui::DragValue::new(&mut alt.target_value)
+                                                            .speed(1),
+                                                    );
+
+                                                    let alt_match_label = match alt.name_match_mode {
+                                                        OcrNameMatchMode::Exact => "Match: Exact",
+                                                        OcrNameMatchMode::Contains => {
+                                                            "Match: Contains"
+                                                        }
+                                                    };
+                                                    egui::ComboBox::from_id_source(format!(
+                                                        "alt_match_{}_{}",
+                                                        idx, alt_idx
+                                                    ))
+                                                    .selected_text(alt_match_label)
+                                                    .width(120.0)
+                                                    .show_ui(ui, |ui| {
+                                                        ui.selectable_value(
+                                                            &mut alt.name_match_mode,
+                                                            OcrNameMatchMode::Exact,
+                                                            "Match: Exact",
+                                                        );
+                                                        ui.selectable_value(
+                                                            &mut alt.name_match_mode,
+                                                            OcrNameMatchMode::Contains,
+                                                            "Match: Contains",
+                                                        );
+                                                    });
+
+                                                    ui.label("Delay");
+                                                    ui.add(
+                                                        egui::DragValue::new(&mut alt.delay_ms)
+                                                            .suffix(" ms")
+                                                            .speed(10),
+                                                    );
+
+                                                    if ui.link("Remove").clicked() {
+                                                        remove_alt = Some(alt_idx);
                                                     }
                                                 });
+                                            }
+                                            if let Some(alt_idx) = remove_alt {
+                                                alt_targets.remove(alt_idx);
+                                            }
+
+                                            egui::CollapsingHeader::new("Advanced")
+                                                .id_source(format!("ocr_more_{}", idx))
+                                                .default_open(false)
+                                                .show(ui, |ui| {
                                                 ui.horizontal(|ui| {
-                                                    ui.label("Scale:");
-                                                    ui.add(egui::DragValue::new(scale_factor).clamp_range(1..=4).speed(1));
-                                                    ui.checkbox(invert_colors, "Invert");
-                                                    ui.checkbox(grayscale, "Grayscale");
+                                                    ui.label("Image preprocessing:");
+                                                    let mut preset = infer_ocr_preprocess_preset(
+                                                        *scale_factor,
+                                                        *invert_colors,
+                                                        *grayscale,
+                                                    );
+                                                    let previous_preset = preset;
+                                                    let preset_label = match preset {
+                                                        OcrPreprocessPreset::Default => "Default",
+                                                        OcrPreprocessPreset::HighContrast => "High-contrast",
+                                                        OcrPreprocessPreset::Invert => "Invert",
+                                                        OcrPreprocessPreset::Grayscale => "Grayscale",
+                                                        OcrPreprocessPreset::Custom => "Custom",
+                                                    };
+                                                    let preset_combo =
+                                                        egui::ComboBox::from_id_source(format!(
+                                                            "ocr_preset_{}",
+                                                            idx
+                                                        ))
+                                                        .selected_text(preset_label);
+                                                    preset_combo.show_ui(ui, |ui| {
+                                                        ui.selectable_value(
+                                                            &mut preset,
+                                                            OcrPreprocessPreset::Default,
+                                                            "Default",
+                                                        );
+                                                        ui.selectable_value(
+                                                            &mut preset,
+                                                            OcrPreprocessPreset::HighContrast,
+                                                            "High-contrast",
+                                                        );
+                                                        ui.selectable_value(
+                                                            &mut preset,
+                                                            OcrPreprocessPreset::Invert,
+                                                            "Invert",
+                                                        );
+                                                        ui.selectable_value(
+                                                            &mut preset,
+                                                            OcrPreprocessPreset::Grayscale,
+                                                            "Grayscale",
+                                                        );
+                                                        if preset == OcrPreprocessPreset::Custom {
+                                                            ui.selectable_value(
+                                                                &mut preset,
+                                                                OcrPreprocessPreset::Custom,
+                                                                "Custom",
+                                                            );
+                                                        }
+                                                    });
+                                                    if preset != previous_preset {
+                                                        apply_ocr_preprocess_preset(
+                                                            preset,
+                                                            scale_factor,
+                                                            invert_colors,
+                                                            grayscale,
+                                                        );
+                                                    }
                                                 });
 
                                                 ui.horizontal(|ui| {
-                                                    ui.label("Decode:");
-                                                    egui::ComboBox::from_id_source(format!("ocr_decode_{}", idx))
-                                                        .selected_text(match decode_mode {
-                                                            OcrDecodeMode::Greedy => "Greedy",
-                                                            OcrDecodeMode::BeamSearch => "Beam",
-                                                        })
-                                                        .show_ui(ui, |ui| {
-                                                            ui.selectable_value(decode_mode, OcrDecodeMode::Greedy, "Greedy");
-                                                            ui.selectable_value(decode_mode, OcrDecodeMode::BeamSearch, "Beam");
-                                                        });
+                                                    ui.label("Accuracy vs speed:");
+                                                    let mut accuracy = if matches!(
+                                                        decode_mode,
+                                                        OcrDecodeMode::BeamSearch
+                                                    ) {
+                                                        OcrAccuracyMode::HighAccuracy
+                                                    } else {
+                                                        OcrAccuracyMode::Fast
+                                                    };
+                                                    let previous_accuracy = accuracy;
+                                                    egui::ComboBox::from_id_source(format!(
+                                                        "ocr_accuracy_{}",
+                                                        idx
+                                                    ))
+                                                    .selected_text(match accuracy {
+                                                        OcrAccuracyMode::Fast => "Fast",
+                                                        OcrAccuracyMode::HighAccuracy => "High accuracy",
+                                                    })
+                                                    .show_ui(ui, |ui| {
+                                                        ui.selectable_value(
+                                                            &mut accuracy,
+                                                            OcrAccuracyMode::Fast,
+                                                            "Fast",
+                                                        );
+                                                        ui.selectable_value(
+                                                            &mut accuracy,
+                                                            OcrAccuracyMode::HighAccuracy,
+                                                            "High accuracy",
+                                                        );
+                                                    });
+                                                    if accuracy != previous_accuracy {
+                                                        *decode_mode = match accuracy {
+                                                            OcrAccuracyMode::Fast => {
+                                                                OcrDecodeMode::Greedy
+                                                            }
+                                                            OcrAccuracyMode::HighAccuracy => {
+                                                                OcrDecodeMode::BeamSearch
+                                                            }
+                                                        };
+                                                    }
 
-                                                    if matches!(decode_mode, OcrDecodeMode::BeamSearch) {
-                                                        ui.label("Width:");
+                                                    if matches!(accuracy, OcrAccuracyMode::HighAccuracy) {
+                                                        ui.label("Beam width:");
                                                         ui.add(egui::DragValue::new(beam_width).clamp_range(2..=20));
                                                     }
                                                 });
-
-                                                // Simplified match mode
-                                                egui::ComboBox::from_id_source(format!("match_{}", idx))
-                                                    .selected_text(match name_match_mode {
-                                                        OcrNameMatchMode::Exact => "Exact Match",
-                                                        OcrNameMatchMode::Contains => "Contains",
-                                                    })
-                                                    .show_ui(ui, |ui| {
-                                                        ui.selectable_value(name_match_mode, OcrNameMatchMode::Exact, "Exact Match");
-                                                        ui.selectable_value(name_match_mode, OcrNameMatchMode::Contains, "Contains");
-                                                    });
                                             });
                                         }
                                     }
@@ -453,9 +704,9 @@ pub fn render_ui(
     // 4. Control Buttons
     ui.vertical_centered(|ui| {
         let (btn_text, btn_color) = if is_running {
-            ("Stop Macro", egui::Color32::from_rgb(255, 100, 100))
+            ("Stop", egui::Color32::from_rgb(255, 100, 100))
         } else {
-            ("Start Macro", egui::Color32::from_rgb(100, 255, 100))
+            ("Start", egui::Color32::from_rgb(100, 255, 100))
         };
 
         let button = egui::Button::new(egui::RichText::new(btn_text).size(16.0).color(btn_color))

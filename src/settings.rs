@@ -6,16 +6,15 @@ pub type NormRect = (f32, f32, f32, f32);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
-    #[serde(default)]
     pub collection_filler: CollectionFillerSettings,
 
-    #[serde(default)]
     pub accept_item: AcceptItemSettings,
 
-    #[serde(default)]
     pub custom_macros: Vec<NamedMacro>,
 
-    #[serde(default)]
+    #[serde(default = "default_emergency_stop_hotkey")]
+    pub emergency_stop_hotkey: HotkeyConfig,
+
     pub always_on_top: bool,
 }
 
@@ -25,7 +24,110 @@ impl Default for AppSettings {
             collection_filler: CollectionFillerSettings::default(),
             accept_item: AcceptItemSettings::default(),
             custom_macros: vec![NamedMacro::default()],
+            emergency_stop_hotkey: default_emergency_stop_hotkey(),
             always_on_top: false,
+        }
+    }
+}
+
+fn default_emergency_stop_hotkey() -> HotkeyConfig {
+    HotkeyConfig {
+        key: None,
+        modifiers: HotkeyModifiers::default(),
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum HotkeyKey {
+    A,
+    B,
+    C,
+    D,
+    E,
+    F,
+    G,
+    H,
+    I,
+    J,
+    K,
+    L,
+    M,
+    N,
+    O,
+    P,
+    Q,
+    R,
+    S,
+    T,
+    U,
+    V,
+    W,
+    X,
+    Y,
+    Z,
+    Digit0,
+    Digit1,
+    Digit2,
+    Digit3,
+    Digit4,
+    Digit5,
+    Digit6,
+    Digit7,
+    Digit8,
+    Digit9,
+    F1,
+    F2,
+    F3,
+    F4,
+    F5,
+    F6,
+    F7,
+    F8,
+    F9,
+    F10,
+    F11,
+    F12,
+    Escape,
+    Space,
+    Enter,
+    Tab,
+    Backspace,
+    Insert,
+    Delete,
+    Home,
+    End,
+    PageUp,
+    PageDown,
+    ArrowUp,
+    ArrowDown,
+    ArrowLeft,
+    ArrowRight,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct HotkeyModifiers {
+    pub ctrl: bool,
+    pub alt: bool,
+    pub shift: bool,
+    pub meta: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HotkeyConfig {
+    pub key: Option<HotkeyKey>,
+    pub modifiers: HotkeyModifiers,
+}
+
+impl Default for HotkeyConfig {
+    fn default() -> Self {
+        Self {
+            key: Some(HotkeyKey::E),
+            modifiers: HotkeyModifiers {
+                ctrl: true,
+                shift: true,
+                alt: false,
+                meta: false,
+            },
         }
     }
 }
@@ -48,20 +150,15 @@ pub struct CollectionFillerSettings {
 
     // Speed and matching settings
     pub delay_ms: u64,
-    #[serde(default = "default_red_dot_tolerance")]
     pub red_dot_tolerance: f32,
 
     // Color filtering settings (to distinguish red dots from grey dots)
-    #[serde(default = "default_min_red")]
     pub min_red: u8,
-    #[serde(default = "default_red_dominance")]
     pub red_dominance: u8,
 
     // Red dot image path
-    #[serde(default = "default_red_dot_path")]
     pub red_dot_path: String,
 
-    #[serde(default = "default_true")]
     pub show_in_overlay: bool,
 }
 
@@ -88,29 +185,12 @@ impl Default for CollectionFillerSettings {
     }
 }
 
-fn default_red_dot_tolerance() -> f32 {
-    0.85
-}
-
-fn default_min_red() -> u8 {
-    150
-}
-
-fn default_red_dominance() -> u8 {
-    30
-}
-
-fn default_red_dot_path() -> String {
-    "red-dot.png".to_string()
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcceptItemSettings {
     pub image_path: String,
     pub interval_ms: u64,
     pub tolerance: f32, // Treated as Minimum Confidence (0.0-1.0), default 0.85
     pub search_region: Option<NormRect>,
-    #[serde(default = "default_true")]
     pub show_in_overlay: bool,
 }
 
@@ -139,16 +219,6 @@ impl Default for ComparisonMode {
     }
 }
 
-fn default_scale_factor() -> u32 {
-    2
-}
-fn default_true() -> bool {
-    true
-}
-fn default_beam_width() -> u32 {
-    10
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
 pub enum OcrDecodeMode {
     Greedy,
@@ -173,10 +243,18 @@ impl Default for OcrNameMatchMode {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OcrAltTarget {
+    pub target_stat: String,
+    pub target_value: i32,
+    pub comparison: ComparisonMode,
+    pub name_match_mode: OcrNameMatchMode,
+    pub delay_ms: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NamedMacro {
     pub name: String,
-    #[serde(default = "default_true")]
     pub show_in_overlay: bool,
     pub settings: CustomMacroSettings,
 }
@@ -214,30 +292,16 @@ pub enum MacroAction {
     },
     OcrSearch {
         ocr_region: Option<NormRect>,
-        #[serde(default = "default_scale_factor")]
         scale_factor: u32,
-        #[serde(default)]
         invert_colors: bool,
-        #[serde(default = "default_true")]
         grayscale: bool,
-        #[serde(default)]
         decode_mode: OcrDecodeMode,
-        #[serde(default = "default_beam_width")]
         beam_width: u32,
-        #[serde(default)]
         target_stat: String,
-        #[serde(default)]
         target_value: i32,
-        #[serde(default)]
-        alt_target_enabled: bool,
-        #[serde(default)]
-        alt_target_stat: String,
-        #[serde(default)]
-        alt_target_value: i32,
-        #[serde(default)]
         comparison: ComparisonMode,
-        #[serde(default)]
         name_match_mode: OcrNameMatchMode,
+        alt_targets: Vec<OcrAltTarget>,
     },
 }
 
@@ -257,6 +321,7 @@ impl Default for ClickMethod {
 pub enum MouseButton {
     Left,
     Right,
+    Middle,
 }
 
 impl Default for MouseButton {
@@ -269,7 +334,6 @@ impl Default for MouseButton {
 pub struct CustomMacroSettings {
     pub actions: Vec<MacroAction>,
     pub loop_enabled: bool,
-    #[serde(default)]
     pub infinite_loop: bool,
     pub loop_count: u32,
 }
@@ -293,18 +357,10 @@ impl AppSettings {
     /// Load settings from file, or create default if doesn't exist
     pub fn load() -> Self {
         match fs::read_to_string(Self::SETTINGS_FILE) {
-            Ok(contents) => {
-                match serde_json::from_str::<AppSettings>(&contents) {
-                    Ok(mut settings) => {
-                        // Ensure we have at least one macro
-                        if settings.custom_macros.is_empty() {
-                            settings.custom_macros.push(NamedMacro::default());
-                        }
-                        settings
-                    }
-                    Err(_) => Self::default(),
-                }
-            }
+            Ok(contents) => match serde_json::from_str::<AppSettings>(&contents) {
+                Ok(settings) => settings,
+                Err(_) => Self::default(),
+            },
             Err(_) => Self::default(),
         }
     }

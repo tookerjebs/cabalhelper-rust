@@ -39,7 +39,7 @@ impl Tool for ImageClickerTool {
         if self.worker.get_status().contains("Stopped") {
             // Already stopped
         } else {
-            self.worker.set_status("Stopped (ESC pressed)");
+            self.worker.set_status("Stopped (emergency hotkey)");
         }
     }
 

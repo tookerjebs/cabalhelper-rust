@@ -1,147 +1,148 @@
-use crate::core::window::get_client_rect_in_screen_coords;
-use image::{ImageBuffer, Rgb};
+use crate::core::window::{get_client_rect_in_screen_coords, get_window_rect_in_screen_coords};
+use image::{ImageBuffer, Rgba};
+use std::sync::{Arc, Mutex};
 use windows::Win32::Foundation::HWND;
-use windows::Win32::Graphics::Gdi::{
-    BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, GetDIBits,
-    ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, SRCCOPY,
+use windows_capture::capture::{Context, GraphicsCaptureApiHandler};
+use windows_capture::frame::Frame;
+use windows_capture::graphics_capture_api::InternalCaptureControl;
+use windows_capture::settings::{
+    ColorFormat, CursorCaptureSettings, DirtyRegionSettings, DrawBorderSettings,
+    MinimumUpdateIntervalSettings, SecondaryWindowSettings, Settings,
 };
+use windows_capture::window::Window;
 
-/// Capture a region of a window using BitBlt
-/// Note: This captures visible pixels, so the window should be visible
-pub fn capture_region(
-    hwnd: HWND,
+struct CapturedFrame {
+    width: u32,
+    height: u32,
+    rgba: Vec<u8>,
+}
+
+struct CaptureFlags {
     region: (i32, i32, i32, i32),
-) -> Result<ImageBuffer<Rgb<u8>, Vec<u8>>, String> {
-    unsafe {
-        // Get window dimensions
-        let window_rect = get_client_rect_in_screen_coords(hwnd)
-            .ok_or_else(|| "Failed to get window client area".to_string())?;
+    client_offset: (i32, i32),
+    window_size: (i32, i32),
+    output: Arc<Mutex<Option<CapturedFrame>>>,
+}
 
-        let window_width = window_rect.2;
-        let window_height = window_rect.3;
+struct OneShotCapture {
+    flags: CaptureFlags,
+    scratch: Vec<u8>,
+}
 
-        // Get client-area device context
-        let hdc = GetDC(hwnd);
-        if hdc.is_invalid() {
-            return Err("Failed to get window device context".to_string());
+impl GraphicsCaptureApiHandler for OneShotCapture {
+    type Flags = CaptureFlags;
+    type Error = String;
+
+    fn new(ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            flags: ctx.flags,
+            scratch: Vec::new(),
+        })
+    }
+
+    fn on_frame_arrived(
+        &mut self,
+        frame: &mut Frame,
+        capture_control: InternalCaptureControl,
+    ) -> Result<(), Self::Error> {
+        let (region_x, region_y, region_w, region_h) = self.flags.region;
+        if region_w <= 0 || region_h <= 0 {
+            capture_control.stop();
+            return Err("Invalid OCR region size".to_string());
         }
 
-        // Create compatible DC and bitmap for the entire window
-        let mem_dc = CreateCompatibleDC(hdc);
-        if mem_dc.is_invalid() {
-            let _ = ReleaseDC(hwnd, hdc);
-            return Err("Failed to create compatible DC".to_string());
+        let frame_w = frame.width();
+        let frame_h = frame.height();
+        if frame_w == 0 || frame_h == 0 {
+            capture_control.stop();
+            return Err("Invalid capture frame size".to_string());
         }
 
-        let bitmap = CreateCompatibleBitmap(hdc, window_width, window_height);
-        if bitmap.is_invalid() {
-            let _ = DeleteDC(mem_dc);
-            let _ = ReleaseDC(hwnd, hdc);
-            return Err("Failed to create compatible bitmap".to_string());
-        }
-
-        let old_bitmap = SelectObject(mem_dc, bitmap);
-
-        // Use BitBlt to capture the window content
-        let result = BitBlt(
-            mem_dc,
-            0,
-            0,
-            window_width,
-            window_height,
-            hdc,
-            0,
-            0,
-            SRCCOPY,
-        );
-
-        // BitBlt returns Result<(), windows::core::Error> in windows 0.52
-        if result.is_err() {
-            let _ = SelectObject(mem_dc, old_bitmap);
-            let _ = DeleteObject(bitmap);
-            let _ = DeleteDC(mem_dc);
-            let _ = ReleaseDC(hwnd, hdc);
-            return Err("BitBlt failed - could not capture window".to_string());
-        }
-
-        // Prepare bitmap info for GetDIBits
-        let mut bmi = BITMAPINFO {
-            bmiHeader: BITMAPINFOHEADER {
-                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-                biWidth: window_width,
-                biHeight: -window_height, // Negative for top-down bitmap
-                biPlanes: 1,
-                biBitCount: 24, // RGB (3 bytes per pixel)
-                biCompression: BI_RGB.0 as u32,
-                biSizeImage: 0,
-                biXPelsPerMeter: 0,
-                biYPelsPerMeter: 0,
-                biClrUsed: 0,
-                biClrImportant: 0,
-            },
-            bmiColors: [Default::default(); 1],
+        let (offset_x, offset_y) = self.flags.client_offset;
+        let (window_w, window_h) = self.flags.window_size;
+        let scale_x = if window_w > 0 {
+            frame_w as f32 / window_w as f32
+        } else {
+            1.0
+        };
+        let scale_y = if window_h > 0 {
+            frame_h as f32 / window_h as f32
+        } else {
+            1.0
         };
 
-        // Allocate buffer for pixel data (BGR format from Windows)
-        let buffer_size = (window_width * window_height * 3) as usize;
-        let mut buffer: Vec<u8> = vec![0; buffer_size];
+        let start_x = ((offset_x + region_x) as f32 * scale_x).round() as i32;
+        let start_y = ((offset_y + region_y) as f32 * scale_y).round() as i32;
+        let end_x = (start_x as f32 + (region_w as f32 * scale_x)).round() as i32;
+        let end_y = (start_y as f32 + (region_h as f32 * scale_y)).round() as i32;
 
-        // Get bitmap bits
-        let scan_lines = GetDIBits(
-            mem_dc,
-            bitmap,
-            0,
-            window_height as u32,
-            Some(buffer.as_mut_ptr() as *mut _),
-            &mut bmi,
-            DIB_RGB_COLORS,
-        );
+        let sx = start_x.max(0).min(frame_w as i32);
+        let sy = start_y.max(0).min(frame_h as i32);
+        let ex = end_x.max(sx + 1).min(frame_w as i32);
+        let ey = end_y.max(sy + 1).min(frame_h as i32);
 
-        // Cleanup GDI objects
-        let _ = SelectObject(mem_dc, old_bitmap);
-        let _ = DeleteObject(bitmap);
-        let _ = DeleteDC(mem_dc);
-        let _ = ReleaseDC(hwnd, hdc);
+        let buffer = frame
+            .buffer_crop(sx as u32, sy as u32, ex as u32, ey as u32)
+            .map_err(|e| format!("Capture buffer error: {}", e))?;
 
-        if scan_lines == 0 {
-            return Err("Failed to get bitmap bits".to_string());
-        }
+        let bytes = buffer.as_nopadding_buffer(&mut self.scratch).to_vec();
+        let captured = CapturedFrame {
+            width: buffer.width(),
+            height: buffer.height(),
+            rgba: bytes,
+        };
 
-        // Extract the requested region from the full window capture
-        let (region_x, region_y, region_width, region_height) = region;
-
-        // Validate region bounds
-        if region_x < 0
-            || region_y < 0
-            || region_x + region_width > window_width
-            || region_y + region_height > window_height
-        {
-            return Err(format!(
-                "Region ({}, {}, {}x{}) is out of window bounds ({}x{})",
-                region_x, region_y, region_width, region_height, window_width, window_height
-            ));
-        }
-
-        // Create output image buffer (RGB format)
-        let mut img_buffer = ImageBuffer::new(region_width as u32, region_height as u32);
-
-        // Copy pixels from captured buffer to image buffer
-        // Windows uses BGR format, we need RGB
-        for y in 0..region_height {
-            for x in 0..region_width {
-                let src_x = region_x + x;
-                let src_y = region_y + y;
-                let src_idx = ((src_y * window_width + src_x) * 3) as usize;
-
-                // Convert BGR to RGB
-                let b = buffer[src_idx];
-                let g = buffer[src_idx + 1];
-                let r = buffer[src_idx + 2];
-
-                img_buffer.put_pixel(x as u32, y as u32, Rgb([r, g, b]));
-            }
-        }
-
-        Ok(img_buffer)
+        *self.flags.output.lock().unwrap() = Some(captured);
+        capture_control.stop();
+        Ok(())
     }
+}
+
+/// Capture a window region using Windows Graphics Capture.
+pub fn capture_window_region(
+    hwnd: HWND,
+    region: (i32, i32, i32, i32),
+) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>, String> {
+    let client_rect = get_client_rect_in_screen_coords(hwnd)
+        .ok_or_else(|| "Failed to get client rect".to_string())?;
+    let window_rect = get_window_rect_in_screen_coords(hwnd)
+        .ok_or_else(|| "Failed to get window rect".to_string())?;
+
+    let client_offset = (client_rect.0 - window_rect.0, client_rect.1 - window_rect.1);
+    let window_size = (window_rect.2, window_rect.3);
+
+    let output = Arc::new(Mutex::new(None));
+    let flags = CaptureFlags {
+        region,
+        client_offset,
+        window_size,
+        output: output.clone(),
+    };
+
+    let window = Window::from_raw_hwnd(hwnd.0 as *mut std::ffi::c_void);
+    let settings = Settings::new(
+        window,
+        CursorCaptureSettings::Default,
+        DrawBorderSettings::WithoutBorder,
+        SecondaryWindowSettings::Default,
+        MinimumUpdateIntervalSettings::Default,
+        DirtyRegionSettings::Default,
+        ColorFormat::Rgba8,
+        flags,
+    );
+
+    let control = OneShotCapture::start_free_threaded(settings)
+        .map_err(|e| format!("Capture start failed: {}", e))?;
+    control
+        .wait()
+        .map_err(|e| format!("Capture wait failed: {}", e))?;
+
+    let captured = output
+        .lock()
+        .unwrap()
+        .take()
+        .ok_or_else(|| "No capture frame received".to_string())?;
+
+    ImageBuffer::from_raw(captured.width, captured.height, captured.rgba)
+        .ok_or_else(|| "Failed to build capture image".to_string())
 }

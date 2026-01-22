@@ -1,10 +1,13 @@
+use crate::core::hotkey::{hotkey_from_config, hotkey_label};
 use crate::core::window::is_window_valid;
-use crate::settings::{AppSettings, NamedMacro, MAX_CUSTOM_MACROS};
+use crate::settings::{AppSettings, HotkeyConfig, NamedMacro, MAX_CUSTOM_MACROS};
 use crate::tools::collection_filler::CollectionFillerTool;
 use crate::tools::custom_macro::CustomMacroTool;
 use crate::tools::image_clicker::ImageClickerTool;
 use crate::tools::r#trait::Tool;
 use eframe::egui;
+use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
+use global_hotkey::hotkey::HotKey;
 use windows::Win32::Foundation::HWND;
 
 // Macro to toggle a tool with mutual exclusion
@@ -30,10 +33,14 @@ pub struct CabalHelperApp {
     is_overlay_mode: bool,
     show_log_panel: bool,
     show_help_window: bool,
+    capturing_emergency_hotkey: bool,
+    hotkey_manager: Option<GlobalHotKeyManager>,
+    registered_hotkey: Option<HotKey>,
+    registered_hotkey_config: HotkeyConfig,
+    hotkey_error: Option<String>,
 
     // Optimization state
     last_window_check: std::time::Instant,
-    last_esc_check: std::time::Instant,
 
     last_window_always_on_top: bool,
 }
@@ -42,6 +49,23 @@ impl Default for CabalHelperApp {
     fn default() -> Self {
         // Load settings
         let settings = AppSettings::load();
+
+        let hotkey_manager = GlobalHotKeyManager::new().ok();
+        let mut registered_hotkey: Option<HotKey> = None;
+        let registered_hotkey_config = settings.emergency_stop_hotkey.clone();
+        let mut hotkey_error: Option<String> = None;
+
+        if let Some(manager) = hotkey_manager.as_ref() {
+            if let Some(hotkey) = hotkey_from_config(&settings.emergency_stop_hotkey) {
+                if let Err(err) = manager.register(hotkey.clone()) {
+                    hotkey_error = Some(format!("Hotkey registration failed: {:?}", err));
+                } else {
+                    registered_hotkey = Some(hotkey);
+                }
+            }
+        } else {
+            hotkey_error = Some("Global hotkey manager unavailable".to_string());
+        }
 
         // Build tools dynamically
         let (tools, tool_names) = Self::build_tools(&settings);
@@ -62,8 +86,12 @@ impl Default for CabalHelperApp {
             is_overlay_mode: false,
             show_log_panel: false,
             show_help_window: false,
+            capturing_emergency_hotkey: false,
+            hotkey_manager,
+            registered_hotkey,
+            registered_hotkey_config,
+            hotkey_error,
             last_window_check: std::time::Instant::now(),
-            last_esc_check: std::time::Instant::now(),
             last_window_always_on_top: false,
         }
     }
@@ -149,6 +177,50 @@ impl CabalHelperApp {
             .filter(|idx| self.tool_visible_in_overlay(*idx))
             .collect()
     }
+
+    fn sync_hotkey_registration(&mut self) {
+        if self.settings.emergency_stop_hotkey == self.registered_hotkey_config {
+            return;
+        }
+
+        let Some(manager) = self.hotkey_manager.as_ref() else {
+            self.hotkey_error = Some("Global hotkey manager unavailable".to_string());
+            self.settings.emergency_stop_hotkey = self.registered_hotkey_config.clone();
+            return;
+        };
+
+        let old_config = self.registered_hotkey_config.clone();
+        let old_hotkey = self.registered_hotkey.clone();
+
+        if let Some(hotkey) = &old_hotkey {
+            let _ = manager.unregister(hotkey.clone());
+        }
+
+        if let Some(hotkey) = hotkey_from_config(&self.settings.emergency_stop_hotkey) {
+            match manager.register(hotkey.clone()) {
+                Ok(()) => {
+                    self.registered_hotkey = Some(hotkey);
+                    self.registered_hotkey_config = self.settings.emergency_stop_hotkey.clone();
+                    self.hotkey_error = None;
+                }
+                Err(err) => {
+                    self.hotkey_error = Some(format!("Hotkey registration failed: {:?}", err));
+                    self.settings.emergency_stop_hotkey = old_config.clone();
+                    self.registered_hotkey_config = old_config;
+                    self.registered_hotkey = None;
+                    if let Some(old) = old_hotkey {
+                        if manager.register(old.clone()).is_ok() {
+                            self.registered_hotkey = Some(old);
+                        }
+                    }
+                }
+            }
+        } else {
+            self.registered_hotkey = None;
+            self.registered_hotkey_config = self.settings.emergency_stop_hotkey.clone();
+            self.hotkey_error = None;
+        }
+    }
 }
 
 impl eframe::App for CabalHelperApp {
@@ -174,15 +246,21 @@ impl eframe::App for CabalHelperApp {
             self.last_window_always_on_top = self.settings.always_on_top;
         }
 
-        // Emergency stop on ESC key
-        use crate::core::input::is_escape_key_down;
-        if self.last_esc_check.elapsed() > std::time::Duration::from_millis(100) {
-            if is_escape_key_down() {
+        // Emergency stop on global hotkey
+        if let Some(hotkey) = &self.registered_hotkey {
+            let hotkey_id = hotkey.id();
+            let mut triggered = false;
+            while let Ok(event) = GlobalHotKeyEvent::receiver().try_recv() {
+                if event.id == hotkey_id && event.state == HotKeyState::Pressed {
+                    triggered = true;
+                }
+            }
+            if triggered {
                 for tool in &mut self.tools {
                     tool.stop();
                 }
+                ctx.request_repaint();
             }
-            self.last_esc_check = std::time::Instant::now();
         }
 
         // Periodic check if window is still valid
@@ -356,6 +434,9 @@ impl eframe::App for CabalHelperApp {
                     &mut self.game_hwnd,
                     &mut self.status_message,
                     &mut self.settings.always_on_top,
+                    &mut self.settings.emergency_stop_hotkey,
+                    &mut self.capturing_emergency_hotkey,
+                    self.hotkey_error.as_deref(),
                 );
 
                 match action {
@@ -443,7 +524,13 @@ impl eframe::App for CabalHelperApp {
                                         ui.heading("Quick start");
                                         ui.label("- Connect to the game window.");
                                         ui.label("- Pick a tool tab, configure it, then press Start.");
-                                        ui.label("- Press ESC any time to stop running tools.");
+                                        ui.label(
+                                            "- Optional: set an emergency stop hotkey in the header.",
+                                        );
+                                        ui.label(format!(
+                                            "- When set, press {} to stop running tools.",
+                                            hotkey_label(&self.settings.emergency_stop_hotkey)
+                                        ));
 
                                         ui.add_space(10.0);
                                         ui.heading("Image Clicker settings");
@@ -601,6 +688,7 @@ impl eframe::App for CabalHelperApp {
                     });
 
                 self.sync_tool_names_from_settings();
+                self.sync_hotkey_registration();
 
                 // Check if macro count changed (e.g., macro was deleted)
                 // We need to rebuild tools to stay in sync

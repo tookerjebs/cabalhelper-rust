@@ -2,8 +2,8 @@ use windows::{
     Win32::Foundation::{HWND, POINT},
     Win32::Graphics::Gdi::{ClientToScreen, GetDC, GetPixel, ReleaseDC, ScreenToClient},
     Win32::UI::WindowsAndMessaging::{
-        FindWindowA, GetAncestor, GetClientRect, GetCursorPos, GetWindowTextA, IsWindow,
-        WindowFromPoint, GA_PARENT,
+        FindWindowA, GetAncestor, GetClientRect, GetCursorPos, GetWindowRect, GetWindowTextA,
+        IsWindow, WindowFromPoint, GA_PARENT,
     },
 };
 
@@ -64,6 +64,22 @@ pub fn get_client_rect_in_screen_coords(hwnd: HWND) -> Option<(i32, i32, i32, i3
             top_left.y,
             bottom_right.x - top_left.x, // Width
             bottom_right.y - top_left.y, // Height
+        ))
+    }
+}
+
+/// Get window rectangle in screen coordinates (includes borders/title bar).
+pub fn get_window_rect_in_screen_coords(hwnd: HWND) -> Option<(i32, i32, i32, i32)> {
+    unsafe {
+        let mut rect = windows::Win32::Foundation::RECT::default();
+        if GetWindowRect(hwnd, &mut rect).is_err() {
+            return None;
+        }
+        Some((
+            rect.left,
+            rect.top,
+            rect.right - rect.left,
+            rect.bottom - rect.top,
         ))
     }
 }

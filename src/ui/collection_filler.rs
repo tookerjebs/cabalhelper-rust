@@ -44,7 +44,7 @@ pub fn render_ui(
     if !game_connected {
         ui.colored_label(
             egui::Color32::RED,
-            "Please connect to game first (top right)",
+            "Please connect to game first (top left)",
         );
         return UiAction::None;
     }
@@ -54,6 +54,7 @@ pub fn render_ui(
         ctx.request_repaint();
     }
 
+    ui.checkbox(&mut settings.show_in_overlay, "Show in overlay");
     ui.add_space(8.0);
 
     // 1. Settings Group
@@ -100,9 +101,6 @@ pub fn render_ui(
                 0.01..=0.99,
             ));
         });
-
-        ui.add_space(4.0);
-        ui.checkbox(&mut settings.show_in_overlay, "Show in overlay");
     });
 
     ui.add_space(12.0);
@@ -228,9 +226,9 @@ pub fn render_ui(
     // 3. Control
     ui.vertical_centered(|ui| {
         let (btn_text, btn_color) = if is_running {
-            ("Stop Filler", egui::Color32::from_rgb(255, 100, 100))
+            ("Stop", egui::Color32::from_rgb(255, 100, 100))
         } else {
-            ("Start Filler", egui::Color32::from_rgb(100, 255, 100))
+            ("Start", egui::Color32::from_rgb(100, 255, 100))
         };
 
         let button = egui::Button::new(egui::RichText::new(btn_text).size(16.0).color(btn_color))

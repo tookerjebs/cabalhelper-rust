@@ -1,6 +1,6 @@
 # Cabal Helper - Rust Edition
 
-Automation tools for Cabal Online, rewritten in Rust for performance and stability.
+An Application offering quality of life macros for Cabal Online. Offers 2 hard coded macros (Collection filler and image clicker) and the ability to create your own macros including OCR search capabilities - meaning you can use it to automate the Myth Level, Stellar Link, Arrival Skill rolling. Or just simply use it for trivial, repetitive movements (e.g. collecting your e-mails, buying multiple positions from agent shop) Use it in ways that are compliant with the terms of service of the server you are playing on.
 
 ## Features
 
@@ -15,13 +15,13 @@ Automation tools for Cabal Online, rewritten in Rust for performance and stabili
 
 ## Usage
 
-1. Download the latest release from https://github.com/tookerjebs/cabalhelper-rust/releases
-2. Put `image.png` and `red-dot.png` next to the executable (or set custom paths in the UI).
+1. Download the latest release from https://github.com/tookerjebs/cabalhelper-rust/releases (coming soon)
+2. Put `image.png` and `red-dot.png` next to the executable (or screenshot those yourself and set custom paths in the UI).
 3. Run `cabalhelper-rust.exe` and connect to the game window.
 
 ## Notes
 
-- Settings are saved locally in `cabalhelper_settings.json`.
+- Settings are saved automatically and locally in `cabalhelper_settings.json`.
 - OCR actions require a visible game window for capture.
 
 ## Build
