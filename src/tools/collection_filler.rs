@@ -68,6 +68,7 @@ impl Tool for CollectionFillerTool {
         ui: &mut egui::Ui,
         settings: &mut crate::settings::AppSettings,
         game_hwnd: Option<HWND>,
+        hotkey_error: Option<&str>,
     ) {
         let settings = &mut settings.collection_filler;
 
@@ -102,6 +103,7 @@ impl Tool for CollectionFillerTool {
             is_running,
             &status,
             game_hwnd.is_some(),
+            hotkey_error,
         );
 
         // Handle action

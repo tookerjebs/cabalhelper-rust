@@ -206,13 +206,7 @@ pub fn render_header(
                     emergency_stop_hotkey.modifiers = HotkeyModifiers::default();
                 }
 
-                if let Some(err) = hotkey_error {
-                    ui.label(
-                        egui::RichText::new(err)
-                            .color(egui::Color32::from_rgb(200, 120, 120))
-                            .size(10.0),
-                    );
-                }
+                let _ = hotkey_error;
             });
 
             if *capturing_emergency_hotkey {

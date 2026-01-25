@@ -38,6 +38,7 @@ pub fn render_ui(
     is_running: bool,
     status: &str,
     game_connected: bool,
+    hotkey_error: Option<&str>,
 ) -> UiAction {
     let mut action = UiAction::None;
 
@@ -248,19 +249,7 @@ pub fn render_ui(
     ui.add_space(6.0);
 
     // 4. Status
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("Status:").strong());
-
-        let status_color = if status.contains("Running") || status.contains("Active") {
-            egui::Color32::from_rgb(100, 255, 100)
-        } else if status.contains("Error") || status.contains("Failed") {
-            egui::Color32::from_rgb(255, 100, 100)
-        } else {
-            egui::Color32::GRAY
-        };
-
-        ui.label(egui::RichText::new(status).color(status_color));
-    });
+    crate::ui::status::render_status(ui, status, hotkey_error);
 
     action
 }

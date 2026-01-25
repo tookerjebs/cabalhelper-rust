@@ -97,6 +97,7 @@ impl Tool for CustomMacroTool {
         ui: &mut egui::Ui,
         settings: &mut crate::settings::AppSettings,
         game_hwnd: Option<HWND>,
+        hotkey_error: Option<&str>,
     ) {
         if self.macro_index >= settings.custom_macros.len() {
             ui.colored_label(egui::Color32::RED, "Error: Macro profile not found");
@@ -165,6 +166,7 @@ impl Tool for CustomMacroTool {
             &status,
             game_hwnd.is_some(),
             can_delete,
+            hotkey_error,
         );
 
         match action {

@@ -1,6 +1,8 @@
 use crate::core::hotkey::hotkey_from_config;
 use crate::core::window::is_window_valid;
-use crate::settings::{AppSettings, HotkeyConfig, NamedMacro, MAX_CUSTOM_MACROS};
+use crate::settings::{
+    AppSettings, HotkeyConfig, HotkeyModifiers, NamedMacro, MAX_CUSTOM_MACROS,
+};
 use crate::tools::collection_filler::CollectionFillerTool;
 use crate::tools::custom_macro::CustomMacroTool;
 use crate::tools::image_clicker::ImageClickerTool;
@@ -38,6 +40,7 @@ pub struct CabalHelperApp {
     registered_hotkey: Option<HotKey>,
     registered_hotkey_config: HotkeyConfig,
     hotkey_error: Option<String>,
+    hotkey_capture_suspended: bool,
 
     // Optimization state
     last_window_check: std::time::Instant,
@@ -91,6 +94,7 @@ impl Default for CabalHelperApp {
             registered_hotkey,
             registered_hotkey_config,
             hotkey_error,
+            hotkey_capture_suspended: false,
             last_window_check: std::time::Instant::now(),
             last_window_always_on_top: false,
         }
@@ -98,6 +102,25 @@ impl Default for CabalHelperApp {
 }
 
 impl CabalHelperApp {
+    fn sync_hotkey_capture_state(&mut self) {
+        if self.capturing_emergency_hotkey {
+            if !self.hotkey_capture_suspended {
+                if let (Some(manager), Some(hotkey)) =
+                    (self.hotkey_manager.as_ref(), self.registered_hotkey.as_ref())
+                {
+                    let _ = manager.unregister(hotkey.clone());
+                }
+                self.registered_hotkey = None;
+                self.registered_hotkey_config = HotkeyConfig {
+                    key: None,
+                    modifiers: HotkeyModifiers::default(),
+                };
+                self.hotkey_capture_suspended = true;
+            }
+        } else if self.hotkey_capture_suspended {
+            self.hotkey_capture_suspended = false;
+        }
+    }
     /// Build tools dynamically: hardcoded tools + one tool per custom macro
     fn build_tools(settings: &AppSettings) -> (Vec<Box<dyn Tool>>, Vec<String>) {
         let mut tools: Vec<Box<dyn Tool>> = Vec::new();
@@ -179,6 +202,9 @@ impl CabalHelperApp {
     }
 
     fn sync_hotkey_registration(&mut self) {
+        if self.capturing_emergency_hotkey {
+            return;
+        }
         if self.settings.emergency_stop_hotkey == self.registered_hotkey_config {
             return;
         }
@@ -246,6 +272,8 @@ impl eframe::App for CabalHelperApp {
             self.last_window_always_on_top = self.settings.always_on_top;
         }
 
+        self.sync_hotkey_capture_state();
+
         // Emergency stop on global hotkey
         if let Some(hotkey) = &self.registered_hotkey {
             let hotkey_id = hotkey.id();
@@ -288,58 +316,7 @@ impl eframe::App for CabalHelperApp {
                 .map(|tool| tool.get_log())
                 .unwrap_or_default();
 
-            egui::SidePanel::right("log_panel")
-                .resizable(true)
-                .default_width(280.0)
-                .min_width(200.0)
-                .show(ctx, |ui| {
-                    egui::Frame::none()
-                        .fill(egui::Color32::from_rgb(12, 12, 12))
-                        .inner_margin(egui::Margin::same(8.0))
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                ui.label(
-                                    egui::RichText::new("Log")
-                                        .strong()
-                                        .color(egui::Color32::LIGHT_GRAY),
-                                );
-                                ui.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Center),
-                                    |ui| {
-                                        ui.label(
-                                            egui::RichText::new(format!(
-                                                "{} lines",
-                                                log_snapshot.len()
-                                            ))
-                                            .small()
-                                            .color(egui::Color32::DARK_GRAY),
-                                        );
-                                    },
-                                );
-                            });
-
-                            ui.add_space(6.0);
-                            egui::ScrollArea::vertical()
-                                .auto_shrink([false, false])
-                                .show(ui, |ui| {
-                                    if log_snapshot.is_empty() {
-                                        ui.label(
-                                            egui::RichText::new("No log entries yet.")
-                                                .italics()
-                                                .color(egui::Color32::DARK_GRAY),
-                                        );
-                                    } else {
-                                        for line in log_snapshot {
-                                            ui.label(
-                                                egui::RichText::new(line)
-                                                    .monospace()
-                                                    .color(egui::Color32::from_rgb(200, 200, 200)),
-                                            );
-                                        }
-                                    }
-                                });
-                        });
-                });
+            crate::ui::log_panel::render_log_panel(ctx, &log_snapshot);
         }
 
         panel.show(ctx, |ui| {
@@ -403,7 +380,7 @@ impl eframe::App for CabalHelperApp {
                             ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(level));
                             self.last_window_always_on_top = self.settings.always_on_top;
                             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(
-                                [720.0, 620.0].into(),
+                                [760.0, 620.0].into(),
                             ));
                         }
                     });
@@ -438,6 +415,7 @@ impl eframe::App for CabalHelperApp {
                     &mut self.capturing_emergency_hotkey,
                     self.hotkey_error.as_deref(),
                 );
+                self.sync_hotkey_capture_state();
 
                 match action {
                     crate::ui::app_header::HeaderAction::Connect(hwnd) => {
@@ -451,7 +429,7 @@ impl eframe::App for CabalHelperApp {
                         let monitor_size = ctx.input(|i| i.viewport().monitor_size);
                         let current_size = inner_rect
                             .map(|rect| rect.size())
-                            .unwrap_or(egui::vec2(720.0, 620.0));
+                            .unwrap_or(egui::vec2(760.0, 620.0));
 
                         self.show_log_panel = !self.show_log_panel;
 
@@ -628,7 +606,13 @@ impl eframe::App for CabalHelperApp {
                                 .position(|name| name == &self.selected_tab)
                             {
                                 if let Some(tool) = self.tools.get_mut(idx) {
-                                    tool.update(ctx, ui, &mut self.settings, self.game_hwnd);
+                                    tool.update(
+                                        ctx,
+                                        ui,
+                                        &mut self.settings,
+                                        self.game_hwnd,
+                                        self.hotkey_error.as_deref(),
+                                    );
                                 }
                             }
                         });

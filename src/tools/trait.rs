@@ -17,7 +17,14 @@ pub trait Tool {
     fn start(&mut self, settings: &AppSettings, game_hwnd: Option<HWND>);
 
     /// Update loop for UI and logic
-    fn update(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, settings: &mut AppSettings, game_hwnd: Option<HWND>);
+    fn update(
+        &mut self,
+        ctx: &egui::Context,
+        ui: &mut egui::Ui,
+        settings: &mut AppSettings,
+        game_hwnd: Option<HWND>,
+        hotkey_error: Option<&str>,
+    );
 
     /// Read current status log (for UI display)
     fn get_log(&self) -> Vec<String>;

@@ -63,6 +63,7 @@ impl Tool for ImageClickerTool {
         ui: &mut egui::Ui,
         settings: &mut crate::settings::AppSettings,
         game_hwnd: Option<HWND>,
+        hotkey_error: Option<&str>,
     ) {
         let settings = &mut settings.accept_item;
 
@@ -110,6 +111,7 @@ impl Tool for ImageClickerTool {
             is_running,
             &status,
             game_hwnd.is_some(),
+            hotkey_error,
         );
 
         // Update settings from string buffer immediately
