@@ -10,6 +10,7 @@ use crate::tools::r#trait::Tool;
 use eframe::egui;
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use global_hotkey::hotkey::HotKey;
+use std::collections::HashSet;
 use windows::Win32::Foundation::HWND;
 
 // Macro to toggle a tool with mutual exclusion
@@ -102,6 +103,36 @@ impl Default for CabalHelperApp {
 }
 
 impl CabalHelperApp {
+    fn ensure_unique_macro_names(&mut self) {
+        let mut used: HashSet<String> = HashSet::new();
+
+        for (idx, named_macro) in self.settings.custom_macros.iter_mut().enumerate() {
+            let original = named_macro.name.clone();
+            let base = original.trim();
+            let base = if base.is_empty() {
+                format!("Macro {}", idx + 1)
+            } else {
+                base.to_string()
+            };
+
+            let mut candidate = base.clone();
+            let mut suffix = 2;
+            while used.contains(&candidate) {
+                candidate = format!("{} ({})", base, suffix);
+                suffix += 1;
+            }
+
+            if candidate != original {
+                named_macro.name = candidate.clone();
+                if self.selected_tab == original {
+                    self.selected_tab = candidate.clone();
+                }
+            }
+
+            used.insert(candidate);
+        }
+    }
+
     fn sync_hotkey_capture_state(&mut self) {
         if self.capturing_emergency_hotkey {
             if !self.hotkey_capture_suspended {
@@ -308,15 +339,15 @@ impl eframe::App for CabalHelperApp {
         }
 
         if !self.is_overlay_mode && self.show_log_panel {
-            let log_snapshot = self
+            let (log_snapshot, is_running) = self
                 .tool_names
                 .iter()
                 .position(|name| name == &self.selected_tab)
                 .and_then(|idx| self.tools.get(idx))
-                .map(|tool| tool.get_log())
+                .map(|tool| (tool.get_log(), tool.is_running()))
                 .unwrap_or_default();
 
-            crate::ui::log_panel::render_log_panel(ctx, &log_snapshot);
+            crate::ui::log_panel::render_log_panel(ctx, &log_snapshot, is_running);
         }
 
         panel.show(ctx, |ui| {
@@ -560,12 +591,12 @@ impl eframe::App for CabalHelperApp {
                                 }
                             }
 
-                            if self.settings.custom_macros.len() < MAX_CUSTOM_MACROS {
-                                let btn = egui::Button::new(
-                                    egui::RichText::new("+")
-                                        .size(16.0)
-                                        .color(egui::Color32::from_rgb(140, 140, 140)),
-                                )
+                if self.settings.custom_macros.len() < MAX_CUSTOM_MACROS {
+                    let btn = egui::Button::new(
+                        egui::RichText::new("+")
+                            .size(16.0)
+                            .color(egui::Color32::from_rgb(140, 140, 140)),
+                    )
                                 .frame(true)
                                 .fill(egui::Color32::from_rgb(22, 22, 24))
                                 .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(40, 40, 40)))
@@ -573,13 +604,26 @@ impl eframe::App for CabalHelperApp {
                                 .min_size(egui::vec2(30.0, 30.0));
 
                                 if ui.add(btn).clicked() {
-                                    let new_macro_name =
+                                    let base_name =
                                         format!("Macro {}", self.settings.custom_macros.len() + 1);
+                                    let existing: HashSet<String> = self
+                                        .settings
+                                        .custom_macros
+                                        .iter()
+                                        .map(|m| m.name.clone())
+                                        .collect();
+                                    let mut candidate = base_name.clone();
+                                    let mut suffix = 2;
+                                    while existing.contains(&candidate) {
+                                        candidate = format!("{} ({})", base_name, suffix);
+                                        suffix += 1;
+                                    }
+
                                     self.settings
                                         .custom_macros
-                                        .push(NamedMacro::new(new_macro_name.clone()));
+                                        .push(NamedMacro::new(candidate.clone()));
                                     self.rebuild_tools();
-                                    self.selected_tab = new_macro_name;
+                                    self.selected_tab = candidate;
                                     self.settings.auto_save();
                                 }
                             }
@@ -618,6 +662,7 @@ impl eframe::App for CabalHelperApp {
                         });
                     });
 
+                self.ensure_unique_macro_names();
                 self.sync_tool_names_from_settings();
                 self.sync_hotkey_registration();
 

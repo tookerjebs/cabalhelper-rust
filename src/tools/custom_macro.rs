@@ -8,12 +8,20 @@ use crate::settings::{
 use crate::tools::r#trait::Tool;
 use crate::ui::custom_macro::{render_ui, CustomMacroUiAction};
 use eframe::egui;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{
     MessageBoxW, MB_ICONINFORMATION, MB_OK, MB_SETFOREGROUND, MB_TOPMOST,
 };
+
+fn format_ocr_display(text: &str) -> String {
+    let mut display = text.replace("\r\n", "\\n");
+    display = display.replace('\r', "\\n");
+    display = display.replace('\n', "\\n");
+    display
+}
 
 fn show_success_message(stat: &str, value: i32) {
     let title = "OCR Match Found";
@@ -310,6 +318,8 @@ impl CustomMacroTool {
             }
 
             let mut iteration: u32 = 0;
+            let mut ocr_counts: HashMap<String, u32> = HashMap::new();
+            let mut end_status = "Macro completed!";
 
             loop {
                 if !*running.lock().unwrap() {
@@ -487,8 +497,13 @@ impl CustomMacroTool {
 
                                     match engine.get_text(&ocr_input) {
                                         Ok(text) => {
-                                            *status.lock().unwrap() = format!("OCR: {}", text);
-                                            Worker::push_log(&log, &format!("OCR RAW: {}", text));
+                                            {
+                                                let counter =
+                                                    ocr_counts.entry(text.clone()).or_insert(0);
+                                                *counter += 1;
+                                            }
+
+                                            Worker::push_log(&log, &format_ocr_display(&text));
 
                                             if let Some((detected_stat, detected_value)) = parse_ocr_result(&text) {
                                                 let normalize_contains = |s: &str| -> String {
@@ -559,6 +574,7 @@ impl CustomMacroTool {
                                                     *status.lock().unwrap() =
                                                         format!("MATCH FOUND! {} {}", detected_stat, detected_value);
                                                     show_success_message(&detected_stat, detected_value);
+                                                    end_status = "Stopped (match found)";
                                                     *running.lock().unwrap() = false;
                                                     break;
                                                 }
@@ -581,10 +597,29 @@ impl CustomMacroTool {
             }
 
             if *running.lock().unwrap() {
-                *status.lock().unwrap() = "Macro completed!".to_string();
+                *status.lock().unwrap() = end_status.to_string();
             } else {
-                *status.lock().unwrap() = "Stopped by user".to_string();
+                if end_status == "Macro completed!" {
+                    *status.lock().unwrap() = "Stopped by user".to_string();
+                } else {
+                    *status.lock().unwrap() = end_status.to_string();
+                }
             }
+
+            if !ocr_counts.is_empty() {
+                let mut ranking: Vec<(String, u32)> = ocr_counts.into_iter().collect();
+                ranking.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+
+                if let Ok(mut log) = log.lock() {
+                    log.clear();
+                }
+
+                Worker::push_log(&log, "OCR SUMMARY (most frequent to least):");
+                for (key, value) in ranking {
+                    Worker::push_log(&log, &format!("{} x{}", format_ocr_display(&key), value));
+                }
+            }
+
             *running.lock().unwrap() = false;
         });
     }
