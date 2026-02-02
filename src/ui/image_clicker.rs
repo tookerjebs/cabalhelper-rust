@@ -82,11 +82,11 @@ pub fn render_ui(
         ui.heading(egui::RichText::new("Detection Area").size(14.0).strong());
         ui.add_space(4.0);
 
-        ui.label(
-            egui::RichText::new("Optional: Improve performance by limiting search area.")
-                .small()
-                .color(egui::Color32::GRAY),
-        );
+    ui.label(
+        egui::RichText::new("Required: You must set a region (full screen scanning disabled).")
+            .small()
+            .color(egui::Color32::YELLOW),
+    );
         ui.add_space(4.0);
 
         ui.horizontal(|ui| {
@@ -103,8 +103,8 @@ pub fn render_ui(
                 );
             } else {
                 ui.label(
-                    egui::RichText::new("Not set (Full Screen)")
-                        .color(egui::Color32::YELLOW)
+                    egui::RichText::new("Not set")
+                        .color(egui::Color32::RED)
                         .italics(),
                 );
             }
@@ -142,6 +142,7 @@ pub fn render_ui(
     ui.add_space(12.0);
 
     // 3. Controls
+    let can_start = search_region.is_some();
     ui.vertical_centered(|ui| {
         let (btn_text, btn_color) = if is_running {
             ("Stop", egui::Color32::from_rgb(255, 100, 100))
@@ -152,7 +153,13 @@ pub fn render_ui(
         let button = egui::Button::new(egui::RichText::new(btn_text).size(16.0).color(btn_color))
             .min_size(egui::vec2(200.0, 35.0));
 
-        if ui.add(button).clicked() {
+        let response = if is_running {
+            ui.add(button)
+        } else {
+            ui.add_enabled(can_start, button)
+        };
+
+        if response.clicked() {
             action = if is_running {
                 ImageUiAction::Stop
             } else {

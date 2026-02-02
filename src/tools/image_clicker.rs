@@ -50,6 +50,12 @@ impl Tool for ImageClickerTool {
     fn start(&mut self, app_settings: &crate::settings::AppSettings, game_hwnd: Option<HWND>) {
         let settings = &app_settings.accept_item;
 
+        if settings.search_region.is_none() {
+            self.worker
+                .set_status("Set a region first (full screen scanning disabled)");
+            return;
+        }
+
         if let Some(hwnd) = game_hwnd {
             self.start_automation(settings.clone(), hwnd);
         } else {
@@ -132,7 +138,10 @@ impl Tool for ImageClickerTool {
                 settings.search_region = None;
             }
             ImageUiAction::Start => {
-                if game_hwnd.is_none() {
+                if settings.search_region.is_none() {
+                    self.worker
+                        .set_status("Set a region first (full screen scanning disabled)");
+                } else if game_hwnd.is_none() {
                     self.worker.set_status("Connect to game first");
                 } else {
                     self.start_automation(settings.clone(), game_hwnd.unwrap());
@@ -161,6 +170,13 @@ impl ImageClickerTool {
             move |running: Arc<Mutex<bool>>,
                   status: Arc<Mutex<String>>,
                   _log: Arc<Mutex<std::collections::VecDeque<String>>>| {
+                if settings.search_region.is_none() {
+                    *status.lock().unwrap() =
+                        "Set a region first (full screen scanning disabled)".to_string();
+                    *running.lock().unwrap() = false;
+                    return;
+                }
+
                 let mut ctx = match AutomationContext::new(game_hwnd) {
                     Ok(c) => c,
                     Err(e) => {
@@ -203,7 +219,7 @@ impl ImageClickerTool {
                             }
 
                             // Hardcoded safety delay after click to prevent double-clicking
-                            delay_ms(500);
+                            delay_ms(150);
                         }
                         _ => {
                             *status.lock().unwrap() = "Searching...".to_string();
