@@ -216,6 +216,7 @@ fn run_automation_loop(
     running: &Arc<Mutex<bool>>,
     status: &Arc<Mutex<String>>,
 ) {
+    let mut current_tab_pos: Option<(u32, u32)> = None;
     while *running.lock().unwrap() {
         // Find potential tab dots (using lower tolerance to catch all candidates)
         let potential_dots =
@@ -240,9 +241,16 @@ fn run_automation_loop(
         }
 
         let tab_pos = red_dots[0];
-        *status.lock().unwrap() = "Found tab, clicking...".to_string();
-        click_at_screen(&mut ctx.gui, tab_pos.0, tab_pos.1);
-        delay_ms(settings.delay_ms);
+        let is_same_tab = current_tab_pos
+            .map(|prev| is_position_near(prev, tab_pos, 20.0))
+            .unwrap_or(false);
+
+        if !is_same_tab {
+            *status.lock().unwrap() = "Found tab, clicking...".to_string();
+            click_at_screen(&mut ctx.gui, tab_pos.0, tab_pos.1);
+            delay_ms(settings.delay_ms);
+            current_tab_pos = Some(tab_pos);
+        }
 
         process_dungeon_list(ctx, &settings, running, status, tab_pos);
     }
@@ -356,12 +364,9 @@ fn process_page_dungeons(
                 break;
             }
 
-            // 1. Process all visible items at current scroll
+            // Process all visible items at current scroll
             let _ = process_visible_items(ctx, settings, running, status);
             any_work_done = true;
-
-            // 2. Double check item area for stragglers (Python logic compliance)
-            let _ = process_visible_items(ctx, settings, running, status);
 
             // 3. Check if THIS dungeon is complete
             // We scan the dungeon list again to see if our dungeon_dot is still red
@@ -439,20 +444,23 @@ fn process_visible_items(
                 click_at_screen(&mut ctx.gui, pos.0, pos.1);
                 delay_ms(settings.delay_ms);
 
-                let btns = [
-                    settings.auto_refill_pos,
-                    settings.register_pos,
-                    settings.yes_pos,
-                ];
-                for btn in btns {
-                    if let Some((x, y)) = btn {
-                        click_at_window_pos(&mut ctx.gui, ctx.game_hwnd, (x, y));
-                        delay_ms(settings.delay_ms);
-                    }
+                if let Some((x, y)) = settings.auto_refill_pos {
+                    click_at_window_pos(&mut ctx.gui, ctx.game_hwnd, (x, y));
+                    delay_ms(settings.delay_ms);
+                }
+                if let Some((x, y)) = settings.register_pos {
+                    click_at_window_pos(&mut ctx.gui, ctx.game_hwnd, (x, y));
+                    delay_ms(settings.delay_ms);
+                }
+                if let Some((x, y)) = settings.yes_pos {
+                    click_at_window_pos(&mut ctx.gui, ctx.game_hwnd, (x, y));
+                    delay_ms(settings.delay_ms);
                 }
 
                 processed = true;
                 delay_ms(settings.delay_ms);
+                // Small settle delay so UI updates dot state before next scan
+                delay_ms(50);
             }
             None => break,
         }

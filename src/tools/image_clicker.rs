@@ -219,7 +219,7 @@ impl ImageClickerTool {
                             }
 
                             // Hardcoded safety delay after click to prevent double-clicking
-                            delay_ms(150);
+                            delay_ms(120);
                         }
                         _ => {
                             *status.lock().unwrap() = "Searching...".to_string();

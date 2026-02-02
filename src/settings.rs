@@ -177,8 +177,8 @@ impl Default for CollectionFillerSettings {
             arrow_right_pos: None,
             delay_ms: 31,
             red_dot_tolerance: 0.85,
-            min_red: 150,
-            red_dominance: 30,
+            min_red: 170,
+            red_dominance: 45,
             red_dot_path: "red-dot.png".to_string(),
             show_in_overlay: true,
         }
