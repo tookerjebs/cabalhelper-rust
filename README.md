@@ -17,14 +17,13 @@ Setup https://youtu.be/nRCmFDyYSU8
 
 ## Usage
 
-1. Download the latest release from https://github.com/tookerjebs/cabalhelper-rust/releases/tag/v0.1
+1. Download the latest release from https://github.com/tookerjebs/cabalhelper-rust/releases/tag/v0.2
 2. Put `image.png` and `red-dot.png` next to the executable (or screenshot those yourself and set custom paths in the UI).
 3. Run `cabalhelper-rust.exe` and connect to the game window.
 
 ## Notes
 
-- Settings are saved automatically and locally in `cabalhelper_settings.json`.
-- OCR actions require a visible game window for capture.
+- Settings are saved automatically and locally in `cabalhelper_settings.json`
 
 ## Build
 
