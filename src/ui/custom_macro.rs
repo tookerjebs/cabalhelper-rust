@@ -3,6 +3,7 @@ use crate::settings::{
     OcrNameMatchMode,
 };
 use eframe::egui;
+use windows::Win32::Foundation::HWND;
 
 #[derive(Debug)]
 pub enum CustomMacroUiAction {
@@ -86,15 +87,16 @@ pub fn render_ui(
     named_macro: &mut NamedMacro,
     click_calibrating_action_index: Option<usize>,
     ocr_calibrating_action_index: Option<usize>,
+    ocr_waiting_for_second_click: bool,
     is_running: bool,
     status: &str,
-    game_connected: bool,
+    game_hwnd: Option<HWND>,
     can_delete: bool, // Can this macro be deleted?
     hotkey_error: Option<&str>,
 ) -> CustomMacroUiAction {
     let mut action = CustomMacroUiAction::None;
 
-    if !game_connected {
+    if game_hwnd.is_none() {
         ui.colored_label(
             egui::Color32::RED,
             "Please connect to game first (top left)",
@@ -364,10 +366,40 @@ pub fn render_ui(
                                         } => {
                                             // Compact OCR UI
                                             ui.horizontal(|ui| {
-                                                if let Some((l, t, w, h)) = ocr_region {
-                                                    ui.label(egui::RichText::new(format!("Region: {:.0},{:.0} {:.0}x{:.0}", l, t, w, h)).monospace().size(11.0));
+                                                if let Some((nl, nt, nw, nh)) = ocr_region {
+                                                    let region_text = if let Some(hwnd) = game_hwnd {
+                                                        if let Some((px, py, pw, ph)) =
+                                                            crate::core::coords::denormalize_rect(
+                                                                hwnd, *nl, *nt, *nw, *nh,
+                                                            )
+                                                        {
+                                                            format!(
+                                                                "Region: Px {},{} {}x{} | Norm {:.3},{:.3} {:.3}x{:.3}",
+                                                                px, py, pw, ph, nl, nt, nw, nh
+                                                            )
+                                                        } else {
+                                                            format!(
+                                                                "Region: Norm {:.3},{:.3} {:.3}x{:.3}",
+                                                                nl, nt, nw, nh
+                                                            )
+                                                        }
+                                                    } else {
+                                                        format!(
+                                                            "Region: Norm {:.3},{:.3} {:.3}x{:.3}",
+                                                            nl, nt, nw, nh
+                                                        )
+                                                    };
+                                                    ui.label(
+                                                        egui::RichText::new(region_text)
+                                                            .monospace()
+                                                            .size(11.0),
+                                                    );
                                                 } else {
-                                                    ui.label(egui::RichText::new("Region: Not Set").color(egui::Color32::RED).size(11.0));
+                                                    ui.label(
+                                                        egui::RichText::new("Region: Not Set")
+                                                            .color(egui::Color32::RED)
+                                                            .size(11.0),
+                                                    );
                                                 }
 
                                                 let is_this_calibrating = ocr_calibrating_action_index == Some(idx);
@@ -382,6 +414,39 @@ pub fn render_ui(
                                                      }
                                                 }
                                             });
+                                            if let Some((nl, nt, nw, nh)) = ocr_region {
+                                                if let Some(hwnd) = game_hwnd {
+                                                    if let Some((_, _, pw, ph)) =
+                                                        crate::core::coords::denormalize_rect(
+                                                            hwnd, *nl, *nt, *nw, *nh,
+                                                        )
+                                                    {
+                                                        if pw < 20 || ph < 20 {
+                                                            ui.label(
+                                                                egui::RichText::new(format!(
+                                                                    "Warning: OCR region is very small ({}x{} px). Recalibrate if this is unintended.",
+                                                                    pw, ph
+                                                                ))
+                                                                .color(egui::Color32::YELLOW)
+                                                                .size(11.0),
+                                                            );
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            if ocr_calibrating_action_index == Some(idx) {
+                                                let hint = if ocr_waiting_for_second_click {
+                                                    "OCR Calibration (2/2): Click the BOTTOM-RIGHT corner in the game window."
+                                                } else {
+                                                    "OCR Calibration (1/2): Click the TOP-LEFT corner in the game window."
+                                                };
+                                                ui.label(
+                                                    egui::RichText::new(hint)
+                                                        .color(egui::Color32::YELLOW)
+                                                        .size(11.0),
+                                                );
+                                            }
 
                                             ui.horizontal(|ui| {
                                                 ui.add(egui::TextEdit::singleline(target_stat).desired_width(100.0).hint_text("Stat Name"));

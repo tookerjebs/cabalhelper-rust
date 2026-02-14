@@ -8,7 +8,7 @@ use crate::settings::{
 use crate::tools::r#trait::Tool;
 use crate::ui::custom_macro::{render_ui, CustomMacroUiAction};
 use eframe::egui;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::HWND;
@@ -164,15 +164,17 @@ impl Tool for CustomMacroTool {
         let status = self.worker.get_status();
         let click_calibrating_index = self.calibrating_action_index;
         let ocr_calibrating_index = self.ocr_calibrating_action_index;
+        let ocr_waiting_for_second_click = self.ocr_region_calibration.is_waiting_for_second_click();
 
         let action = render_ui(
             ui,
             macro_settings,
             click_calibrating_index,
             ocr_calibrating_index,
+            ocr_waiting_for_second_click,
             is_running,
             &status,
-            game_hwnd.is_some(),
+            game_hwnd,
             can_delete,
             hotkey_error,
         );
@@ -238,7 +240,9 @@ impl CustomMacroTool {
         self.worker.start(move |running: Arc<Mutex<bool>>, status: Arc<Mutex<String>>, log: Arc<Mutex<std::collections::VecDeque<String>>>| {
             use crate::core::input::click_at_position;
             use crate::automation::context::AutomationContext;
-            use crate::core::screen_capture::capture_window_region;
+            use crate::core::screen_capture::{
+                capture_window_region_with_debug, window_capture_environment_diagnostics,
+            };
             use crate::core::ocr_parser::{parse_ocr_result, matches_target};
             use crate::core::window::client_to_screen_coords;
             use ocrs::{OcrEngine, OcrEngineParams, ImageSource, DecodeMethod};
@@ -319,7 +323,12 @@ impl CustomMacroTool {
 
             let mut iteration: u32 = 0;
             let mut ocr_counts: HashMap<String, u32> = HashMap::new();
+            let mut ocr_debug_logged_actions: HashSet<usize> = HashSet::new();
             let mut end_status = "Macro completed!";
+
+            if has_ocr_actions {
+                Worker::push_log(&log, &window_capture_environment_diagnostics(game_hwnd));
+            }
 
             loop {
                 if !*running.lock().unwrap() {
@@ -438,25 +447,100 @@ impl CustomMacroTool {
                                 break;
                             }
 
-                            let region = if let Some(region) = ocr_region {
-                                match denormalize_rect(game_hwnd, region.0, region.1, region.2, region.3) {
+                            let (region_norm, region) = if let Some(region_norm) = ocr_region {
+                                let rect = match denormalize_rect(
+                                    game_hwnd,
+                                    region_norm.0,
+                                    region_norm.1,
+                                    region_norm.2,
+                                    region_norm.3,
+                                ) {
                                     Some(rect) => rect,
                                     None => {
-                                        *status.lock().unwrap() = format!("Action {}: Invalid OCR region", idx + 1);
+                                        *status.lock().unwrap() =
+                                            format!("Action {}: Invalid OCR region", idx + 1);
                                         *running.lock().unwrap() = false;
                                         break;
                                     }
-                                }
+                                };
+                                (*region_norm, rect)
                             } else {
                                 *status.lock().unwrap() = format!("Action {}: OCR region not set", idx + 1);
                                 *running.lock().unwrap() = false;
                                 break;
                             };
 
+                            if region.2 < 20 || region.3 < 20 {
+                                let warning = format!(
+                                    "Action {}: OCR region is very small ({}x{} px). Calibration may be wrong.",
+                                    idx + 1,
+                                    region.2,
+                                    region.3
+                                );
+                                *status.lock().unwrap() = warning.clone();
+                                Worker::push_log(&log, &warning);
+                            }
+
                             let engine = ocr_engine.as_ref().unwrap();
 
-                            match capture_window_region(game_hwnd, region) {
-                                Ok(img) => {
+                            match capture_window_region_with_debug(game_hwnd, region) {
+                                Ok((img, debug)) => {
+                                    if !ocr_debug_logged_actions.contains(&idx) {
+                                        Worker::push_log(
+                                            &log,
+                                            &format!(
+                                                "OCR DEBUG action {}: norm=({:.4},{:.4},{:.4},{:.4}) px=({},{} {}x{}) frame={}x{} crop=({},{} {}x{}) scale=({:.3},{:.3}) dpi={} req_client=({},{} {}x{}) client_screen=({},{} {}x{}) window_screen=({},{} {}x{})",
+                                                idx + 1,
+                                                region_norm.0,
+                                                region_norm.1,
+                                                region_norm.2,
+                                                region_norm.3,
+                                                region.0,
+                                                region.1,
+                                                region.2,
+                                                region.3,
+                                                debug.frame_size.0,
+                                                debug.frame_size.1,
+                                                debug.crop_rect_frame.0,
+                                                debug.crop_rect_frame.1,
+                                                debug.crop_rect_frame.2,
+                                                debug.crop_rect_frame.3,
+                                                debug.scale.0,
+                                                debug.scale.1,
+                                                debug.window_dpi,
+                                                debug.requested_region_client.0,
+                                                debug.requested_region_client.1,
+                                                debug.requested_region_client.2,
+                                                debug.requested_region_client.3,
+                                                debug.client_rect_screen.0,
+                                                debug.client_rect_screen.1,
+                                                debug.client_rect_screen.2,
+                                                debug.client_rect_screen.3,
+                                                debug.window_rect_screen.0,
+                                                debug.window_rect_screen.1,
+                                                debug.window_rect_screen.2,
+                                                debug.window_rect_screen.3,
+                                            ),
+                                        );
+
+                                        if (debug.scale.0 - debug.scale.1).abs() > 0.05 {
+                                            Worker::push_log(
+                                                &log,
+                                                "OCR DEBUG hint: X/Y capture scaling mismatch detected; this can cause crop offsets on some systems.",
+                                            );
+                                        }
+                                        if debug.window_dpi > 0 && debug.window_dpi != 96 {
+                                            Worker::push_log(
+                                                &log,
+                                                &format!(
+                                                    "OCR DEBUG hint: non-100% DPI detected ({}). If OCR fails, test with both app and game on the same monitor scaling.",
+                                                    debug.window_dpi
+                                                ),
+                                            );
+                                        }
+                                        ocr_debug_logged_actions.insert(idx);
+                                    }
+
                                     let mut processed_img = image::DynamicImage::ImageRgba8(img);
 
                                     if *invert_colors {
@@ -587,6 +671,22 @@ impl CustomMacroTool {
                                 }
                                 Err(e) => {
                                     *status.lock().unwrap() = format!("Capture Error: {}", e);
+                                    if !ocr_debug_logged_actions.contains(&idx) {
+                                        Worker::push_log(
+                                            &log,
+                                            &format!(
+                                                "OCR DEBUG action {} capture failure: {}",
+                                                idx + 1,
+                                                e
+                                            ),
+                                        );
+                                        Worker::push_log(&log, &window_capture_environment_diagnostics(game_hwnd));
+                                        Worker::push_log(
+                                            &log,
+                                            "OCR DEBUG hint: If this persists, avoid exclusive fullscreen, keep game visible, and update GPU drivers.",
+                                        );
+                                        ocr_debug_logged_actions.insert(idx);
+                                    }
                                 }
                             }
                         },

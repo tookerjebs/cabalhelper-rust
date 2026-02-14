@@ -2,6 +2,7 @@ use crate::core::window::{get_client_rect_in_screen_coords, get_window_rect_in_s
 use image::{ImageBuffer, Rgba};
 use std::sync::{Arc, Mutex};
 use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows_capture::capture::{Context, GraphicsCaptureApiHandler};
 use windows_capture::frame::Frame;
 use windows_capture::graphics_capture_api::InternalCaptureControl;
@@ -17,11 +18,26 @@ struct CapturedFrame {
     rgba: Vec<u8>,
 }
 
+#[derive(Clone, Debug)]
+pub struct CaptureDebugInfo {
+    pub requested_region_client: (i32, i32, i32, i32),
+    pub client_rect_screen: (i32, i32, i32, i32),
+    pub window_rect_screen: (i32, i32, i32, i32),
+    pub frame_size: (u32, u32),
+    pub scale: (f32, f32),
+    pub crop_rect_frame: (i32, i32, i32, i32),
+    pub window_dpi: u32,
+}
+
 struct CaptureFlags {
     region: (i32, i32, i32, i32),
     client_offset: (i32, i32),
     window_size: (i32, i32),
+    client_rect_screen: (i32, i32, i32, i32),
+    window_rect_screen: (i32, i32, i32, i32),
+    window_dpi: u32,
     output: Arc<Mutex<Option<CapturedFrame>>>,
+    debug: Arc<Mutex<Option<CaptureDebugInfo>>>,
 }
 
 struct OneShotCapture {
@@ -93,30 +109,45 @@ impl GraphicsCaptureApiHandler for OneShotCapture {
         };
 
         *self.flags.output.lock().unwrap() = Some(captured);
+        *self.flags.debug.lock().unwrap() = Some(CaptureDebugInfo {
+            requested_region_client: self.flags.region,
+            client_rect_screen: self.flags.client_rect_screen,
+            window_rect_screen: self.flags.window_rect_screen,
+            frame_size: (frame_w, frame_h),
+            scale: (scale_x, scale_y),
+            crop_rect_frame: (sx, sy, ex - sx, ey - sy),
+            window_dpi: self.flags.window_dpi,
+        });
         capture_control.stop();
         Ok(())
     }
 }
 
 /// Capture a window region using Windows Graphics Capture.
-pub fn capture_window_region(
+pub fn capture_window_region_with_debug(
     hwnd: HWND,
     region: (i32, i32, i32, i32),
-) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>, String> {
+) -> Result<(ImageBuffer<Rgba<u8>, Vec<u8>>, CaptureDebugInfo), String> {
     let client_rect = get_client_rect_in_screen_coords(hwnd)
         .ok_or_else(|| "Failed to get client rect".to_string())?;
     let window_rect = get_window_rect_in_screen_coords(hwnd)
         .ok_or_else(|| "Failed to get window rect".to_string())?;
+    let window_dpi = unsafe { GetDpiForWindow(hwnd) };
 
     let client_offset = (client_rect.0 - window_rect.0, client_rect.1 - window_rect.1);
     let window_size = (window_rect.2, window_rect.3);
 
     let output = Arc::new(Mutex::new(None));
+    let debug = Arc::new(Mutex::new(None));
     let flags = CaptureFlags {
         region,
         client_offset,
         window_size,
+        client_rect_screen: client_rect,
+        window_rect_screen: window_rect,
+        window_dpi,
         output: output.clone(),
+        debug: debug.clone(),
     };
 
     let window = Window::from_raw_hwnd(hwnd.0 as *mut std::ffi::c_void);
@@ -142,7 +173,32 @@ pub fn capture_window_region(
         .unwrap()
         .take()
         .ok_or_else(|| "No capture frame received".to_string())?;
+    let debug_info = debug
+        .lock()
+        .unwrap()
+        .take()
+        .ok_or_else(|| "No capture debug info".to_string())?;
 
-    ImageBuffer::from_raw(captured.width, captured.height, captured.rgba)
-        .ok_or_else(|| "Failed to build capture image".to_string())
+    let image = ImageBuffer::from_raw(captured.width, captured.height, captured.rgba)
+        .ok_or_else(|| "Failed to build capture image".to_string())?;
+
+    Ok((image, debug_info))
+}
+
+pub fn window_capture_environment_diagnostics(hwnd: HWND) -> String {
+    let client_rect = get_client_rect_in_screen_coords(hwnd);
+    let window_rect = get_window_rect_in_screen_coords(hwnd);
+    let dpi = unsafe { GetDpiForWindow(hwnd) };
+    let scale = dpi as f32 / 96.0;
+
+    match (client_rect, window_rect) {
+        (Some(c), Some(w)) => format!(
+            "OCR ENV: dpi={} ({:.2}x), client_screen=({}, {}) {}x{}, window_screen=({}, {}) {}x{}",
+            dpi, scale, c.0, c.1, c.2, c.3, w.0, w.1, w.2, w.3
+        ),
+        _ => format!(
+            "OCR ENV: dpi={} ({:.2}x), failed to read client/window rects",
+            dpi, scale
+        ),
+    }
 }
