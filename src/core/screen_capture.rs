@@ -127,6 +127,7 @@ impl GraphicsCaptureApiHandler for OneShotCapture {
 pub fn capture_window_region_with_debug(
     hwnd: HWND,
     region: (i32, i32, i32, i32),
+    capture_border: bool,
 ) -> Result<(ImageBuffer<Rgba<u8>, Vec<u8>>, CaptureDebugInfo), String> {
     let client_rect = get_client_rect_in_screen_coords(hwnd)
         .ok_or_else(|| "Failed to get client rect".to_string())?;
@@ -154,7 +155,11 @@ pub fn capture_window_region_with_debug(
     let settings = Settings::new(
         window,
         CursorCaptureSettings::Default,
-        DrawBorderSettings::WithoutBorder,
+        if capture_border {
+            DrawBorderSettings::Default
+        } else {
+            DrawBorderSettings::WithoutBorder
+        },
         SecondaryWindowSettings::Default,
         MinimumUpdateIntervalSettings::Default,
         DirtyRegionSettings::Default,

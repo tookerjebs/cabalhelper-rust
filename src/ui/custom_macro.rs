@@ -172,6 +172,7 @@ pub fn render_ui(
                 if toolbar_button(ui, "+ OCR", toolbar_color).clicked() {
                     named_macro.settings.actions.push(MacroAction::OcrSearch {
                         ocr_region: None,
+                        capture_border: false,
                         scale_factor: 2,
                         invert_colors: false,
                         grayscale: true,
@@ -351,13 +352,14 @@ pub fn render_ui(
                                                 ui.add(egui::DragValue::new(milliseconds).suffix(" ms").speed(10));
                                             });
                                         }
-                                        MacroAction::OcrSearch {
-                                            ocr_region,
-                                            scale_factor,
-                                            invert_colors,
-                                            grayscale,
-                                            decode_mode,
-                                            beam_width,
+                                    MacroAction::OcrSearch {
+                                        ocr_region,
+                                        capture_border,
+                                        scale_factor,
+                                        invert_colors,
+                                        grayscale,
+                                        decode_mode,
+                                        beam_width,
                                             target_stat,
                                             target_value,
                                             comparison,
@@ -594,6 +596,27 @@ pub fn render_ui(
                                                 .id_source(format!("ocr_more_{}", idx))
                                                 .default_open(false)
                                                 .show(ui, |ui| {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Capture Border:");
+                                                    egui::ComboBox::from_id_source(format!(
+                                                        "ocr_capture_border_{}",
+                                                        idx
+                                                    ))
+                                                    .selected_text(if *capture_border { "Yes" } else { "No" })
+                                                    .width(70.0)
+                                                    .show_ui(ui, |ui| {
+                                                        ui.selectable_value(capture_border, false, "No");
+                                                        ui.selectable_value(capture_border, true, "Yes");
+                                                    });
+                                                });
+                                                ui.label(
+                                                    egui::RichText::new(
+                                                        "Windows 10: if OCR capture fails, set this to Yes.",
+                                                    )
+                                                    .small()
+                                                    .color(egui::Color32::DARK_GRAY),
+                                                );
+
                                                 ui.horizontal(|ui| {
                                                     ui.label("Image preprocessing:");
                                                     let mut preset = infer_ocr_preprocess_preset(

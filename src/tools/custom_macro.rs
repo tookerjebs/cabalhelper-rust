@@ -431,6 +431,7 @@ impl CustomMacroTool {
                         },
                         MacroAction::OcrSearch {
                             ocr_region,
+                            capture_border,
                             scale_factor,
                             invert_colors,
                             grayscale,
@@ -483,7 +484,7 @@ impl CustomMacroTool {
 
                             let engine = ocr_engine.as_ref().unwrap();
 
-                            match capture_window_region_with_debug(game_hwnd, region) {
+                            match capture_window_region_with_debug(game_hwnd, region, *capture_border) {
                                 Ok((img, debug)) => {
                                     if !ocr_debug_logged_actions.contains(&idx) {
                                         Worker::push_log(

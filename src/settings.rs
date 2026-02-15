@@ -292,6 +292,8 @@ pub enum MacroAction {
     },
     OcrSearch {
         ocr_region: Option<NormRect>,
+        #[serde(default)]
+        capture_border: bool,
         scale_factor: u32,
         invert_colors: bool,
         grayscale: bool,
