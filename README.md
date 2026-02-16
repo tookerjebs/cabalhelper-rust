@@ -1,5 +1,7 @@
 # Cabal Helper - Rust Edition
 
+Attention: if the OCR action does not work on Windows10 for you, you need to download v0.2.2 and in advanced settings set "Capture Border" to "Yes"
+
 An Application offering quality of life macros for Cabal Online. Offers 2 hard coded macros (Collection filler and image clicker) and the ability to create your own macros including OCR search capabilities - meaning you can use it to automate the Myth Level, Stellar Link, Arrival Skill rolling. Or just simply use it for trivial, repetitive movements (e.g. collecting your e-mails, buying multiple positions from agent shop) Use it in ways that are compliant with the terms of service of the server you are playing on.
 
 Setup https://youtu.be/nRCmFDyYSU8
